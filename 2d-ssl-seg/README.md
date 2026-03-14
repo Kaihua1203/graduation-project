@@ -145,5 +145,3 @@ Compare best validation metrics:
 - SSL encoder loading is non-strict and compatible with `backbone.*` or `encoder.*` key styles.
 - Keep data split fixed (`LiTS2017/splits/split_seed3407_n200.json`) for fair experiments.
 - Full config field explanations and editable knobs are documented in `configs/CONFIG_GUIDE.md`.
-
-## Nothing
