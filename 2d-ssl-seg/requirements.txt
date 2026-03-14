@@ -1,0 +1,22 @@
+# Unified requirements for SSL + segmentation pipeline.
+# Critical: setuptools<66 provides pkg_resources required by lightning/torchmetrics.
+setuptools>=58,<66
+
+# solo-learn stack
+torch>=1.10.0
+torchvision>=0.11.1
+einops
+lightning==2.1.2
+torchmetrics>=0.6.0,<0.12.0
+tqdm
+wandb
+scipy
+timm
+scikit-learn
+hydra-core
+omegaconf
+
+# 2d-ssl-seg stack
+monai
+PyYAML
+swanlab

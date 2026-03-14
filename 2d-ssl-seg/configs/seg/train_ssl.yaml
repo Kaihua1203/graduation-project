@@ -1,0 +1,39 @@
+seed: 3407
+output_dir: outputs/seg_ssl
+data:
+  train_images_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-Seg/LiTS2017/train/images
+  train_masks_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-Seg/LiTS2017/train/masks
+  val_images_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-Seg/LiTS2017/val/images
+  val_masks_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-Seg/LiTS2017/val/masks
+  image_suffix: .png
+  mask_suffix: .png
+  in_channels: 3
+  num_classes: 3
+  roi_size:
+  - 256
+  - 256
+  train_num_samples: 4
+model:
+  backbone_name: resnet18
+  name: flexible_unet
+pretrained_encoder:
+  enabled: true
+  path: outputs/encoders/lits_vicreg_encoder.pth
+train:
+  epochs: 100
+  freeze_encoder_epochs: 10
+  batch_size: 8
+  num_workers: 4
+  amp: true
+  val_interval: 1
+  lr_encoder: 0.0001
+  lr_decoder: 0.0003
+  weight_decay: 0.0001
+  gpu_ids:
+  - 0
+swanlab:
+  enabled: true
+  project: 2d-ssl-seg
+  experiment_name: seg-ssl
+  description: LiTS2017 segmentation fine-tuning
+  logdir: outputs/swanlab/seg
