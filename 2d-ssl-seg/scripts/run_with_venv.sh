@@ -5,7 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_DIR="${VENV_DIR:-/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/solo-learn}"
-SOLO_LEARN_DIR="${SOLO_LEARN_DIR:-/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/solo-learn}"
+SOLO_LEARN_DIR="${SOLO_LEARN_DIR:-/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/solo-learn}"
 
 if [[ -f "${VENV_DIR}/bin/activate" ]]; then
   set +u
