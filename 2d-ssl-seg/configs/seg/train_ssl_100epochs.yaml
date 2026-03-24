@@ -1,5 +1,5 @@
 seed: 3407
-output_dir: outputs/seg_random
+output_dir: outputs/seg_ssl
 data:
   train_images_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-Seg/LiTS2017/train/images
   train_masks_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-Seg/LiTS2017/train/masks
@@ -17,11 +17,11 @@ model:
   backbone_name: resnet18
   name: flexible_unet
 pretrained_encoder:
-  enabled: false
-  path: ''
+  enabled: true
+  path: outputs/encoders/lits_vicreg_encoder.pth
 train:
   epochs: 100
-  freeze_encoder_epochs: 0
+  freeze_encoder_epochs: 10
   batch_size: 8
   num_workers: 4
   amp: true
@@ -34,6 +34,6 @@ train:
 swanlab:
   enabled: true
   project: 2d-ssl-seg
-  experiment_name: seg-random-100epochs
+  experiment_name: seg-ssl-100epochs
   description: LiTS2017 segmentation fine-tuning
   logdir: outputs/swanlab/seg

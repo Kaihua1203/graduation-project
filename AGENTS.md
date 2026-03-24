@@ -1,24 +1,24 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repo contains a single project in `2d-ssl-seg/`.
-
-- `2d-ssl-seg/src/`: Python entrypoints (`run_ssl_pretrain.py`, `extract_backbone.py`, `train_segmentation.py`).
-- `2d-ssl-seg/configs/`: YAML configs, including SSL and segmentation presets and `CONFIG_GUIDE.md`.
-- `2d-ssl-seg/scripts/`: One-command launchers used in the README.
-- `2d-ssl-seg/outputs/`: Training artifacts (ignored by git).
-
-Data paths are external and not stored in the repo; see `2d-ssl-seg/README.md` for expected LiTS2017 directories.
+See `ARCHITECTURE.md` for the current repository layout and module map.
 
 ## Build, Test, and Development Commands
 Run commands from `2d-ssl-seg/` unless noted.
 
-- `source scripts/run_with_venv.sh`: Activate the recommended venv and path setup.
-- `python -m pip install -r requirements.txt`: Install dependencies in your venv.
-- `bash scripts/run_ssl_pretrain.sh`: SSL pretraining (VICReg + ResNet).
-- `bash scripts/run_extract_encoder.sh /path/to/ssl_checkpoint.ckpt`: Export encoder weights.
-- `bash scripts/run_seg_train_ssl.sh`: Segmentation fine-tuning with SSL encoder.
-- `bash scripts/run_seg_train_random.sh`: Random-init baseline.
+- `source scripts/run_with_venv.sh`: setup environment.
+- `bash scripts/run_ssl_pretrain.sh`: run SSL pretraining.
+- `bash scripts/run_extract_encoder.sh /path/to/ssl_checkpoint.ckpt`: export encoder weights.
+- `bash scripts/run_seg_train_ssl.sh` / `bash scripts/run_seg_train_random.sh`: train segmentation (SSL vs random baseline).
+- `bash scripts/run_seg_eval_lits.sh ssl` / `bash scripts/run_seg_eval_lits.sh random`: evaluate on LiTS.
+
+## Testing Guidelines
+- There is no automated test suite in this repo yet.
+- Validate with end-to-end train + eval:
+  - Check checkpoints: `outputs/seg_ssl/seg-ssl/best_model.pt` and `outputs/seg_random/seg-random/best_model.pt`.
+  - Run: `bash scripts/run_seg_eval_lits.sh ssl` and `bash scripts/run_seg_eval_lits.sh random`.
+  - Verify logs: `outputs/logs/seg-ssl/evaluate_history.jsonl` and `outputs/logs/seg-random/evaluate_history.jsonl`.
+  - Ensure each JSONL record has `dice`, `iou`, and `hd95` (3-decimal rounded).
 
 ## Coding Style & Naming Conventions
 - Python code uses 4-space indentation and standard PEP 8 naming.
@@ -26,27 +26,10 @@ Run commands from `2d-ssl-seg/` unless noted.
 - Config files are YAML; keep keys lower_snake_case and group related settings together.
 - No formatter/linter is configured; keep changes small and consistent with nearby code.
 
-## Testing Guidelines
-- There is no automated test suite in this repo yet.
-- Validate changes with training + evaluation artifacts:
-  - Train and confirm checkpoints exist under `output_dir/experiment_name`:
-    - `outputs/seg_ssl/seg-ssl/best_model.pt`
-    - `outputs/seg_random/seg-random/best_model.pt`
-  - Run evaluation pipeline (GPU):
-    - `bash scripts/run_seg_eval_lits.sh ssl`
-    - `bash scripts/run_seg_eval_lits.sh random`
-    - Optional overrides for custom experiment names:
-      - `SEG_SSL_EXPERIMENT_NAME=<name>`
-      - `SEG_RANDOM_EXPERIMENT_NAME=<name>`
-  - Check evaluation logs (JSONL only):
-    - `outputs/logs/seg-ssl/evaluate_history.jsonl`
-    - `outputs/logs/seg-random/evaluate_history.jsonl`
-  - Confirm each JSONL record contains `dice`, `iou`, and `hd95` (rounded to 3 decimals).
-
 ## Commit & Pull Request Guidelines
 - Use conventional commits with short, imperative subjects:
   - Examples: `feat: add vicreg config for lits`, `fix: handle empty lits directory`.
-- When Codex makes functional changes (e.g., adding/removing evaluation pipeline pieces, training algorithms, or other behavior changes), or performs substantial multi-file/code-volume edits, create at least one commit for that work.
+- When Codex makes functional changes (e.g., adding/removing evaluation pipeline pieces, training algorithms, or other behavior changes), or performs substantial multi-file/code-volume edits, create at least one commit for that work and push it in the github.
 - PRs should include:
   - A concise summary of changes and rationale.
   - Links to related issues (if any).
@@ -56,3 +39,11 @@ Run commands from `2d-ssl-seg/` unless noted.
 ## Security & Configuration Tips
 - Do not commit datasets, checkpoints, or large artifacts; keep them under `outputs/`.
 - If you add new data paths or secrets, document them in `2d-ssl-seg/README.md` and keep them out of git.
+
+## solo-learn Progressive Disclosure
+Scope in this repo:
+- use `solo-learn` only for SSL pretraining and encoder/backbone weight export for downstream segmentation.
+
+Read in order:
+1. `docs/solo-learn/solo-learn-core.md`
+2. `docs/solo-learn/methods_and_backbones.md`
