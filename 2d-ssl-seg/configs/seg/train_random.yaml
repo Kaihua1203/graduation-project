@@ -34,6 +34,6 @@ train:
 swanlab:
   enabled: true
   project: 2d-ssl-seg
-  experiment_name: seg-random-100epochs
+  experiment_name: seg-random
   description: LiTS2017 segmentation fine-tuning
   logdir: outputs/swanlab/seg
