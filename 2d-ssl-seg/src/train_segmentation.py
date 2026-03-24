@@ -1,6 +1,7 @@
 import argparse
 import json
 import random
+import re
 import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -37,6 +38,12 @@ def set_seed(seed: int) -> None:
 def load_yaml(path: Path) -> Dict:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def sanitize_experiment_name(name: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", name.strip())
+    cleaned = cleaned.strip(".-")
+    return cleaned or "seg-training"
 
 
 def list_pairs(images_dir: Path, masks_dir: Path, image_suffix: str, mask_suffix: str) -> List[Dict[str, str]]:
@@ -246,8 +253,13 @@ def main() -> None:
     if args.experiment_name is not None:
         cfg.setdefault("swanlab", {})["experiment_name"] = args.experiment_name
 
-    output_dir = Path(args.output_dir or cfg["output_dir"])
+    experiment_name = sanitize_experiment_name(
+        str(cfg.get("swanlab", {}).get("experiment_name", "seg-training"))
+    )
+    output_root = Path(args.output_dir or cfg["output_dir"])
+    output_dir = output_root / experiment_name
     output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Output directory: {output_dir}")
     sw_run, swanlab_mod = init_swanlab(cfg)
 
     train_pairs = list_pairs(

@@ -131,7 +131,12 @@ Each run writes:
 - `metrics_history.json`
 - `best_model.pt`
 
-under its output dir (e.g. `outputs/seg_ssl` and `outputs/seg_random`).
+under `output_dir/experiment_name` (e.g. `outputs/seg_ssl/seg-ssl` and `outputs/seg_random/seg-random`).
+
+Evaluation writes JSONL logs into separate folders:
+
+- `outputs/logs/seg-ssl/evaluate_history.jsonl`
+- `outputs/logs/seg-random/evaluate_history.jsonl`
 
 Compare best validation metrics:
 

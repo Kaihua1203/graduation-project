@@ -28,13 +28,25 @@ Run commands from `2d-ssl-seg/` unless noted.
 
 ## Testing Guidelines
 - There is no automated test suite in this repo yet.
-- Validate changes by running the relevant training script and checking output artifacts:
-  - `outputs/seg_ssl/**/metrics_history.json`
-  - `outputs/seg_ssl/**/best_model.pt`
+- Validate changes with training + evaluation artifacts:
+  - Train and confirm checkpoints exist under `output_dir/experiment_name`:
+    - `outputs/seg_ssl/seg-ssl/best_model.pt`
+    - `outputs/seg_random/seg-random/best_model.pt`
+  - Run evaluation pipeline (GPU):
+    - `bash scripts/run_seg_eval_lits.sh ssl`
+    - `bash scripts/run_seg_eval_lits.sh random`
+    - Optional overrides for custom experiment names:
+      - `SEG_SSL_EXPERIMENT_NAME=<name>`
+      - `SEG_RANDOM_EXPERIMENT_NAME=<name>`
+  - Check evaluation logs (JSONL only):
+    - `outputs/logs/seg-ssl/evaluate_history.jsonl`
+    - `outputs/logs/seg-random/evaluate_history.jsonl`
+  - Confirm each JSONL record contains `dice`, `iou`, and `hd95` (rounded to 3 decimals).
 
 ## Commit & Pull Request Guidelines
-- This repo has no existing git history to infer a convention. Use short, imperative subjects:
-  - Example: `add vicreg config for lits`.
+- Use conventional commits with short, imperative subjects:
+  - Examples: `feat: add vicreg config for lits`, `fix: handle empty lits directory`.
+- When Codex makes functional changes (e.g., adding/removing evaluation pipeline pieces, training algorithms, or other behavior changes), or performs substantial multi-file/code-volume edits, create at least one commit for that work.
 - PRs should include:
   - A concise summary of changes and rationale.
   - Links to related issues (if any).
