@@ -2,21 +2,32 @@
 
 This file explains all tunable parameters under `configs/`.
 
-## 1) SSL Config: `ssl/vicreg_lits.yaml`
+## 1) SSL Configs: `ssl/vicreg_lits.yaml`, `ssl/simclr_lits.yaml`, `ssl/mocov3_lits.yaml`
 
 ### Core method
 
 - `name`: experiment name shown in logs/checkpoints.
-- `method`: SSL method, currently `vicreg`.
+- `method`: SSL method (`vicreg`, `simclr`, `mocov3`).
 - `backbone.name`: encoder backbone (`resnet18` or `resnet50` recommended).
 
-### VICReg loss
+### Method-specific loss params
 
-- `method_kwargs.proj_hidden_dim`: projector hidden dimension.
-- `method_kwargs.proj_output_dim`: projector output dimension.
-- `method_kwargs.sim_loss_weight`: invariance term weight.
-- `method_kwargs.var_loss_weight`: variance term weight.
-- `method_kwargs.cov_loss_weight`: covariance term weight.
+- VICReg:
+  - `method_kwargs.proj_hidden_dim`: projector hidden dimension.
+  - `method_kwargs.proj_output_dim`: projector output dimension.
+  - `method_kwargs.sim_loss_weight`: invariance term weight.
+  - `method_kwargs.var_loss_weight`: variance term weight.
+  - `method_kwargs.cov_loss_weight`: covariance term weight.
+- SimCLR:
+  - `method_kwargs.proj_hidden_dim`: projector hidden dimension.
+  - `method_kwargs.proj_output_dim`: projector output dimension.
+  - `method_kwargs.temperature`: contrastive temperature.
+- MoCoV3:
+  - `method_kwargs.proj_hidden_dim`: projector hidden dimension.
+  - `method_kwargs.proj_output_dim`: projector output dimension.
+  - `method_kwargs.pred_hidden_dim`: predictor hidden dimension.
+  - `method_kwargs.temperature`: contrastive temperature.
+  - `momentum.base_tau` / `momentum.final_tau`: momentum schedule.
 
 ### Data
 
@@ -128,3 +139,12 @@ Notes:
 4. SSL augmentation strengths (`color_jitter`, `rrc` scale, `gaussian_blur`).
 
 Keep only one major variable change per run for fair comparisons.
+
+## 5) SSL Run Command
+
+- default (vicreg): `bash scripts/run_ssl_pretrain.sh`
+- simclr: `bash scripts/run_ssl_pretrain.sh simclr_lits`
+- mocov3: `bash scripts/run_ssl_pretrain.sh mocov3_lits`
+
+You can still override SwanLab run name by setting:
+`EXPERIMENT_NAME=<your-name> bash scripts/run_ssl_pretrain.sh <config_name>`
