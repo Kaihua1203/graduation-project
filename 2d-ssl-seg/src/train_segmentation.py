@@ -4,7 +4,7 @@ import random
 import re
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import monai
 import numpy as np
@@ -237,6 +237,60 @@ def init_swanlab(cfg: Dict):
     return run, swanlab
 
 
+def save_epoch_checkpoint(
+    checkpoint_path: Path,
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scaler: torch.amp.GradScaler,
+    cfg: Dict,
+    epoch: int,
+    best_dice: float,
+    history: List[Dict[str, Any]],
+    row: Dict[str, Any],
+) -> None:
+    save_model = model.module if isinstance(model, nn.DataParallel) else model
+    payload: Dict[str, Any] = {
+        "model_state_dict": save_model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "scaler_state_dict": scaler.state_dict(),
+        "config": cfg,
+        "epoch": epoch,
+        "best_dice": best_dice,
+        "history": history,
+    }
+    payload.update(row)
+    torch.save(payload, checkpoint_path)
+
+
+def load_resume_checkpoint(
+    ckpt_path: Path,
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scaler: torch.amp.GradScaler,
+) -> Tuple[int, float, List[Dict[str, Any]], bool]:
+    payload = torch.load(ckpt_path, map_location="cpu")
+    if not isinstance(payload, dict) or "model_state_dict" not in payload:
+        raise RuntimeError(f"Invalid resume checkpoint: {ckpt_path}")
+
+    save_model = model.module if isinstance(model, nn.DataParallel) else model
+    save_model.load_state_dict(payload["model_state_dict"], strict=True)
+
+    optimizer_loaded = False
+    if "optimizer_state_dict" in payload:
+        optimizer.load_state_dict(payload["optimizer_state_dict"])
+        optimizer_loaded = True
+    if "scaler_state_dict" in payload:
+        scaler.load_state_dict(payload["scaler_state_dict"])
+
+    start_epoch = int(payload.get("epoch", 0))
+    best_dice = float(payload.get("best_dice", payload.get("val_dice", -1.0)))
+    raw_history = payload.get("history", [])
+    history: List[Dict[str, Any]] = raw_history if isinstance(raw_history, list) else []
+    print(f"Resumed from checkpoint: {ckpt_path}")
+    print(f"Resume epoch: {start_epoch}, best_dice: {best_dice:.6f}, history_len: {len(history)}")
+    return start_epoch, best_dice, history, optimizer_loaded
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train MONAI 2D segmentation with SSL or random init.")
     parser.add_argument("--config", required=True, type=str, help="Path to segmentation YAML config.")
@@ -245,6 +299,8 @@ def main() -> None:
     parser.add_argument("--random-init", action="store_true", help="Force random initialization.")
     parser.add_argument("--gpus", default=None, type=str, help='GPU ids, e.g. "0" or "0,1".')
     parser.add_argument("--experiment-name", default=None, type=str, help="Override swanlab experiment name.")
+    parser.add_argument("--save-every", default=20, type=int, help="Save epoch checkpoint every N epochs.")
+    parser.add_argument("--resume-from", default=None, type=str, help="Resume checkpoint path, e.g. epoch-20.pt.")
     args = parser.parse_args()
 
     cfg = load_yaml(Path(args.config))
@@ -338,11 +394,25 @@ def main() -> None:
     max_epochs = int(cfg["train"]["epochs"])
     val_interval = int(cfg["train"]["val_interval"])
 
-    history = []
+    history: List[Dict[str, Any]] = []
     best_dice = -1.0
     best_path = output_dir / "best_model.pt"
+    save_every = max(1, int(args.save_every))
+    start_epoch = 0
 
-    epoch_bar = tqdm(range(max_epochs), desc="Training", unit="epoch")
+    if args.resume_from is not None:
+        resume_path = Path(args.resume_from)
+        start_epoch, best_dice, history, optimizer_loaded = load_resume_checkpoint(
+            resume_path, model, optimizer, scaler
+        )
+        if start_epoch < freeze_epochs:
+            set_encoder_trainable(model, trainable=False)
+        else:
+            set_encoder_trainable(model, trainable=True)
+            if freeze_epochs > 0 and not optimizer_loaded:
+                optimizer = prepare_optimizer(model, cfg, train_encoder=True)
+
+    epoch_bar = tqdm(range(start_epoch, max_epochs), desc="Training", unit="epoch")
     for epoch in epoch_bar:
         if epoch == freeze_epochs and freeze_epochs > 0:
             tqdm.write(f"Epoch {epoch}: unfreezing encoder and rebuilding optimizer.")
@@ -420,6 +490,21 @@ def main() -> None:
                     )
 
         history.append(row)
+
+        if (epoch + 1) % save_every == 0:
+            epoch_ckpt = output_dir / f"epoch-{epoch + 1}.pt"
+            save_epoch_checkpoint(
+                checkpoint_path=epoch_ckpt,
+                model=model,
+                optimizer=optimizer,
+                scaler=scaler,
+                cfg=cfg,
+                epoch=epoch + 1,
+                best_dice=best_dice,
+                history=history,
+                row=row,
+            )
+            tqdm.write(f"Saved epoch checkpoint: {epoch_ckpt}")
 
         postfix: Dict = {"loss": f"{avg_train_loss:.4f}"}
         if "val_dice" in row:
