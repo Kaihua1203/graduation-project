@@ -26,6 +26,7 @@ train:
   num_workers: 4
   amp: true
   val_interval: 1
+  save_every: 20
   lr_encoder: 0.0001
   lr_decoder: 0.0003
   weight_decay: 0.0001

@@ -299,7 +299,7 @@ def main() -> None:
     parser.add_argument("--random-init", action="store_true", help="Force random initialization.")
     parser.add_argument("--gpus", default=None, type=str, help='GPU ids, e.g. "0" or "0,1".')
     parser.add_argument("--experiment-name", default=None, type=str, help="Override swanlab experiment name.")
-    parser.add_argument("--save-every", default=20, type=int, help="Save epoch checkpoint every N epochs.")
+    parser.add_argument("--save-every", default=None, type=int, help="Save epoch checkpoint every N epochs.")
     parser.add_argument("--resume-from", default=None, type=str, help="Resume checkpoint path, e.g. epoch-20.pt.")
     args = parser.parse_args()
 
@@ -397,7 +397,10 @@ def main() -> None:
     history: List[Dict[str, Any]] = []
     best_dice = -1.0
     best_path = output_dir / "best_model.pt"
-    save_every = max(1, int(args.save_every))
+    if args.save_every is not None:
+        save_every = max(1, int(args.save_every))
+    else:
+        save_every = max(1, int(cfg["train"].get("save_every", 20)))
     start_epoch = 0
 
     if args.resume_from is not None:
