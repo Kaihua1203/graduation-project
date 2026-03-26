@@ -52,6 +52,7 @@ checkpoint:
 
 auto_resume:
   enabled: true
+resume_from_checkpoint: null
 
 wandb:
   enabled: false
