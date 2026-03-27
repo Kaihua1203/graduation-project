@@ -56,7 +56,27 @@ Base model paths must also be local diffusers-compatible directories.
 
 ## Environment
 
-The repository currently does not install `diffusers` and `peft` by default. Install `2d-gen/requirements.txt` in your target venv before running training or inference.
+The default shell wrappers target this venv:
+
+```bash
+/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers
+```
+
+You can override it per run with `VENV_DIR=/path/to/venv`.
+
+The currently validated dependency floor for `2d-gen` is:
+
+- `torch>=2.11.0`
+- `torchvision>=0.26.0`
+- `diffusers>=0.37.1`
+- `transformers>=5.4.0`
+- `peft>=0.18.1`
+- `accelerate>=1.13.0`
+- `numpy>=2.2.6`
+- `scipy>=1.15.3`
+- `Pillow>=12.1.1`
+
+Install `2d-gen/requirements.txt` in your target venv before running training or inference.
 
 If you want to import from the local diffusers source tree instead of an installed package, set:
 
@@ -72,6 +92,12 @@ Run from `2d-gen/`:
 bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 bash scripts/run_infer.sh configs/infer_sd_example.yaml
 bash scripts/run_eval.sh configs/eval_example.yaml
+```
+
+Override the venv when needed:
+
+```bash
+VENV_DIR=/some/other/venv bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 ```
 
 ## Metric Assumptions

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-DEFAULT_VENV_DIR="/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/solo-learn"
+DEFAULT_VENV_DIR="/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers"
 VENV_DIR="${VENV_DIR:-$DEFAULT_VENV_DIR}"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
