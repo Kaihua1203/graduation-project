@@ -1,0 +1,11 @@
+PyYAML
+Pillow
+accelerate>=0.31.0
+diffusers>=0.34.0
+numpy
+peft>=0.11.0
+scipy
+torch
+torchvision
+transformers>=4.45.0
+tqdm

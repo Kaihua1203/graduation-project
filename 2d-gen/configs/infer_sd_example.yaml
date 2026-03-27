@@ -1,0 +1,14 @@
+model:
+  family: stable_diffusion
+  pretrained_path: /abs/path/to/stable-diffusion-model
+  lora_path: /abs/path/to/outputs/sd_lora_example/checkpoints/final_lora
+  local_files_only: true
+
+infer:
+  prompts_path: /abs/path/to/prompts.txt
+  output_dir: outputs/sd_infer_example
+  num_inference_steps: 30
+  guidance_scale: 7.5
+  height: 512
+  width: 512
+  seed: 3407

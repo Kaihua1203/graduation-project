@@ -1,0 +1,9 @@
+eval:
+  real_image_dir: /abs/path/to/real_images
+  generated_image_dir: /abs/path/to/generated_images
+  generated_manifest: /abs/path/to/generated_images/metadata.jsonl
+  output_path: outputs/eval_example/metrics.json
+  batch_size: 8
+  num_workers: 0
+  inception_weights_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/inception_v3/inception_v3_google-0cc3c7bd.pth
+  clip_model_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/clip-vit-base-patch32
