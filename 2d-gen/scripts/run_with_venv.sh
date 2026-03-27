@@ -7,6 +7,8 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ -f "$VENV_DIR/bin/activate" ]; then
   . "$VENV_DIR/bin/activate"
+else
+  printf 'warning: venv not found at %s, using current python environment\n' "$VENV_DIR" >&2
 fi
 
 export PYTHONPATH="$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"

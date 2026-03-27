@@ -64,7 +64,7 @@ The default shell wrappers target this venv:
 
 You can override it per run with `VENV_DIR=/path/to/venv`.
 
-The currently validated dependency floor for `2d-gen` is:
+The current `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers` snapshot was validated with:
 
 - `torch>=2.11.0`
 - `torchvision>=0.26.0`
