@@ -69,7 +69,7 @@ The current `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers` snaps
 - `torch>=2.11.0`
 - `torchvision>=0.26.0`
 - `diffusers>=0.37.1`
-- `transformers>=5.4.0`
+- `transformers>=4.57.3`
 - `peft>=0.18.1`
 - `accelerate>=1.13.0`
 - `numpy>=2.2.6`
@@ -93,6 +93,18 @@ bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 bash scripts/run_infer.sh configs/infer_sd_example.yaml
 bash scripts/run_eval.sh configs/eval_example.yaml
 ```
+
+Build a training manifest from single-level `images/` and `prompts/` directories:
+
+```bash
+bash scripts/run_build_manifest.sh \
+  /absolute/path/to/images \
+  /absolute/path/to/prompts \
+  /absolute/path/to/train_manifest.jsonl
+```
+
+The builder matches files by the same stem, for example `images/0001.png` with `prompts/0001.txt`.
+It only scans the first directory level and writes absolute `image_path` entries into the JSONL.
 
 Override the venv when needed:
 
