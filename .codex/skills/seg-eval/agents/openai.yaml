@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seg Eval Runner"
+  short_description: "Run segmentation evaluation on GPU with fixed workflow"
+  default_prompt: "Run segmentation evaluation by experiment name, eval script, and checkpoint path. Append metrics to JSONL and report conclusion."

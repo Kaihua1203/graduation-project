@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seg Trainer"
+  short_description: "Launch segmentation training jobs with SSL or random init"
+  default_prompt: "Use this skill to create or reuse a segmentation config, assign GPUs, start tmux training sessions, and verify startup once without continuous monitoring."

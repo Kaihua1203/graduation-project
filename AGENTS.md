@@ -3,23 +3,6 @@
 ## Project Structure & Module Organization
 See `ARCHITECTURE.md` for the current repository layout and module map.
 
-## Build, Test, and Development Commands
-Run commands from `2d-ssl-seg/` unless noted.
-
-- `source scripts/run_with_venv.sh`: setup environment.
-- `bash scripts/run_ssl_pretrain.sh`: run SSL pretraining.
-- `bash scripts/run_extract_encoder.sh /path/to/ssl_checkpoint.ckpt`: export encoder weights.
-- `bash scripts/run_seg_train_ssl.sh` / `bash scripts/run_seg_train_random.sh`: train segmentation (SSL vs random baseline).
-- `bash scripts/run_seg_eval_lits.sh ssl` / `bash scripts/run_seg_eval_lits.sh random`: evaluate on LiTS.
-
-## Testing Guidelines
-- There is no automated test suite in this repo yet.
-- Validate with end-to-end train + eval:
-  - Check checkpoints: `outputs/seg_ssl/seg-ssl/best_model.pt` and `outputs/seg_random/seg-random/best_model.pt`.
-  - Run: `bash scripts/run_seg_eval_lits.sh ssl` and `bash scripts/run_seg_eval_lits.sh random`.
-  - Verify logs: `outputs/logs/seg-ssl/evaluate_history.jsonl` and `outputs/logs/seg-random/evaluate_history.jsonl`.
-  - Ensure each JSONL record has `dice`, `iou`, and `hd95` (3-decimal rounded).
-
 ## Coding Style & Naming Conventions
 - Python code uses 4-space indentation and standard PEP 8 naming.
 - Use `snake_case` for functions/variables, `PascalCase` for classes.
@@ -29,7 +12,7 @@ Run commands from `2d-ssl-seg/` unless noted.
 ## Commit & Pull Request Guidelines
 - Use conventional commits with short, imperative subjects:
   - Examples: `feat: add vicreg config for lits`, `fix: handle empty lits directory`.
-- When Codex makes functional changes (e.g., adding/removing evaluation pipeline pieces, training algorithms, or other behavior changes), or performs substantial multi-file/code-volume edits, create at least one commit for that work and push it in the github.
+- When Codex makes functional changes (e.g., adding/removing evaluation pipeline pieces, training algorithms, or other behavior changes), or performs substantial multi-file/code-volume edits, launch a `reviewer` agent to review code. Then create one commit for that work and push it in the github.
 - PRs should include:
   - A concise summary of changes and rationale.
   - Links to related issues (if any).
@@ -43,7 +26,73 @@ Run commands from `2d-ssl-seg/` unless noted.
 ## solo-learn Progressive Disclosure
 Scope in this repo:
 - use `solo-learn` only for SSL pretraining and encoder/backbone weight export for downstream segmentation.
+- solo-learn repo: `/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/solo-learn`
 
 Read in order:
 1. `docs/solo-learn/solo-learn-core.md`
 2. `docs/solo-learn/methods_and_backbones.md`
+
+## diffusers Generation Model Training Docs Progressive Disclosure
+Scope in this repo:
+- use these docs when analyzing or implementing training code for diffusion / generation models based on diffusers pipelines.
+- start from the cross-model training docs first, then drill down into model-specific pipeline docs only when needed.
+- diffusers repo: `/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/diffusers`
+
+Read in order:
+1. `docs/diffusers/training_mapping.md`
+2. `docs/diffusers/training_architecture.md`
+3. `docs/diffusers/stable_diffusion.md`
+4. `docs/diffusers/sdxl.md`
+5. `docs/diffusers/flux.md`
+6. `docs/diffusers/qwenimage.md`
+
+Model-specific drill-down:
+- Start with `stable_diffusion.md` when building the first trainer skeleton or validating the baseline latent diffusion path.
+- Read `sdxl.md` next when adding dual-encoder conditioning, pooled text embeddings, and `time_ids`.
+- Read `flux.md` when switching to transformer-based denoisers, packed latents, and flow-matching style time handling.
+- Read `qwenimage.md` when adding Qwen prompt templating, prompt masks, and QwenImage-specific packed latent training logic.
+
+## **CRITICAL** Tool Usage Rules **CRITICAL**
+- NEVER use sed/cat to read a file or a range of a file. Always use the read tool (use offset + limit for ranged reads).
+- You MUST read every file you modify in full before editing.
+
+## **CRITICAL** Git Rules for Parallel Agents **CRITICAL**
+
+Multiple agents may work on different files in the same worktree simultaneously. You MUST follow these rules:
+
+### Committing
+- **ONLY commit files YOU changed in THIS session**
+- ALWAYS include `fixes #<number>` or `closes #<number>` in the commit message when there is a related issue or PR
+- NEVER use `git add -A` or `git add .` - these sweep up changes from other agents
+- ALWAYS use `git add <specific-file-paths>` listing only files you modified
+- Before committing, run `git status` and verify you are only staging YOUR files
+- Track which files you created/modified/deleted during the session
+
+### Forbidden Git Operations
+These commands can destroy other agents' work:
+- `git reset --hard` - destroys uncommitted changes
+- `git checkout .` - destroys uncommitted changes
+- `git clean -fd` - deletes untracked files
+- `git stash` - stashes ALL changes including other agents' work
+- `git add -A` / `git add .` - stages other agents' uncommitted work
+- `git commit --no-verify` - bypasses required checks and is never allowed
+
+### Safe Workflow
+```bash
+# 1. Check status first
+git status
+
+# 2. Add ONLY your specific files
+git add 
+
+# 3. Commit
+git commit -m "fix: description"
+
+# 4. Push (pull --rebase if needed, but NEVER reset/checkout)
+git pull --rebase && git push
+```
+
+### If Rebase Conflicts Occur
+- Resolve conflicts in YOUR files only
+- If conflict is in a file you didn't modify, abort and ask the user
+- NEVER force push

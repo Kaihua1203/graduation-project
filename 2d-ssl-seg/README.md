@@ -150,3 +150,12 @@ Compare best validation metrics:
 - SSL encoder loading is non-strict and compatible with `backbone.*` or `encoder.*` key styles.
 - Keep data split fixed (`LiTS2017/splits/split_seed3407_n200.json`) for fair experiments.
 - Full config field explanations and editable knobs are documented in `configs/CONFIG_GUIDE.md`.
+
+## Build, Test, and Development Commands
+Run commands from `2d-ssl-seg/` unless noted.
+
+- `source scripts/run_with_venv.sh`: setup environment.
+- `bash scripts/run_ssl_pretrain.sh`: run SSL pretraining.
+- `bash scripts/run_extract_encoder.sh /path/to/ssl_checkpoint.ckpt`: export encoder weights.
+- `bash scripts/run_seg_train_ssl.sh` / `bash scripts/run_seg_train_random.sh`: train segmentation (SSL vs random baseline).
+- `bash scripts/run_seg_eval_lits.sh ssl` / `bash scripts/run_seg_eval_lits.sh random`: evaluate on LiTS.

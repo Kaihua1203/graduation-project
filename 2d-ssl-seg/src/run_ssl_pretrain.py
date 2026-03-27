@@ -11,7 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 
 try:
     from lightning.pytorch import Trainer, seed_everything
-    from lightning.pytorch.callbacks import LearningRateMonitor
+    from lightning.pytorch.callbacks import Callback, LearningRateMonitor
     from lightning.pytorch.loggers.wandb import WandbLogger
     from lightning.pytorch.strategies.ddp import DDPStrategy
 except ImportError:
@@ -27,7 +27,7 @@ except ImportError:
     sys.modules.setdefault("lightning.pytorch.strategies", pl.strategies)
 
     from pytorch_lightning import Trainer, seed_everything
-    from pytorch_lightning.callbacks import LearningRateMonitor
+    from pytorch_lightning.callbacks import Callback, LearningRateMonitor
     from pytorch_lightning.loggers import WandbLogger
     from pytorch_lightning.strategies.ddp import DDPStrategy
 
@@ -35,7 +35,7 @@ except ImportError:
 def _setup_solo_path() -> None:
     solo_root = os.environ.get(
         "SOLO_LEARN_DIR",
-        "/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/solo-learn",
+        "/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/solo-learn",
     )
     solo_root_path = Path(solo_root).resolve()
     if str(solo_root_path) not in sys.path:
@@ -121,6 +121,16 @@ class FilteredSwanLabLogger(_SwanLabBase):  # type: ignore[misc]
             super().log_metrics(epoch_metrics, step=step)
         if step_metrics:
             super().log_metrics(step_metrics, step=step)
+
+
+class SaveFinalCheckpoint(Callback):
+    """Forces one final checkpoint save at train end when using solo Checkpointer."""
+
+    def on_train_end(self, trainer: Trainer, _) -> None:
+        for callback in trainer.callbacks:
+            if isinstance(callback, Checkpointer):
+                callback.save(trainer)
+                return
 
 
 @hydra.main(version_base="1.2")
@@ -234,6 +244,7 @@ def main(cfg: DictConfig):
             keep_prev=cfg.checkpoint.keep_prev,
         )
         callbacks.append(ckpt)
+        callbacks.append(SaveFinalCheckpoint())
 
     if omegaconf_select(cfg, "auto_umap.enabled", False):
         assert _umap_available, "UMAP is not currently avaiable, please install it first with [umap]."

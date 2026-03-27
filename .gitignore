@@ -15,6 +15,7 @@ outputs/
 wandb/
 swanlab/
 lightning_logs/
+.superpowers/
 *.ckpt
 *.pt
 *.pth
