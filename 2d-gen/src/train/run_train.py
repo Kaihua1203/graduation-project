@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from common.config import load_yaml_config, normalize_training_config
+from common.config import load_train_config
 from common.runtime import set_seed
 from train.base_trainer import BaseDiffusionTrainer
 
@@ -15,7 +15,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    config = normalize_training_config(load_yaml_config(args.config))
+    config = load_train_config(args.config)
     set_seed(config["train"].get("seed", 3407))
     trainer = BaseDiffusionTrainer(config)
     final_checkpoint = trainer.train()

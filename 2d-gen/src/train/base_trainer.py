@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib
 import json
 import math
-import re
 import shutil
 from contextlib import nullcontext
 from pathlib import Path
@@ -38,7 +37,7 @@ def resolve_adapter_class(family: str) -> type[BaseModelAdapter]:
 def collate_manifest_batch(examples: list[dict[str, Any]]) -> dict[str, Any]:
     pixel_values = torch.stack([example["pixel_values"] for example in examples], dim=0)
     return {
-        "pixel_values": pixel_values,
+        "pixel_values": pixel_values.to(memory_format=torch.contiguous_format).float(),
         "prompt": [example["prompt"] for example in examples],
         "image_path": [example["image_path"] for example in examples],
     }
@@ -70,15 +69,16 @@ class BaseDiffusionTrainer:
         ddp_kwargs = DistributedDataParallelKwargs(
             find_unused_parameters=self.distributed_config["find_unused_parameters"]
         )
+        project_config = ProjectConfiguration(
+            project_dir=str(self.output_dir),
+            logging_dir=str(self.logging_dir),
+        )
         report_to = None if self.logging_config["report_to"] == "none" else self.logging_config["report_to"]
         self.accelerator = Accelerator(
             gradient_accumulation_steps=self.train_config["gradient_accumulation_steps"],
-            mixed_precision=self.train_config["mixed_precision"] if torch.cuda.is_available() else None,
+            mixed_precision=self.train_config["mixed_precision"],
             log_with=report_to,
-            project_config=ProjectConfiguration(
-                project_dir=str(self.output_dir),
-                logging_dir=str(self.logging_dir),
-            ),
+            project_config=project_config,
             kwargs_handlers=[ddp_kwargs],
         )
 
@@ -91,8 +91,10 @@ class BaseDiffusionTrainer:
         elif self.accelerator.mixed_precision == "bf16":
             self.weight_dtype = torch.bfloat16
 
-        self.adapter: BaseModelAdapter = resolve_adapter_class(self.model_config["family"])(config)
+        adapter_cls = resolve_adapter_class(self.model_config["family"])
+        self.adapter: BaseModelAdapter = adapter_cls(config)
         self._trackers_initialized = False
+        self._logging_enabled = self.logging_config["report_to"] != "none"
 
     def build_dataloader(self) -> DataLoader:
         dataset = ManifestImagePromptDataset(
@@ -110,7 +112,6 @@ class BaseDiffusionTrainer:
             batch_size=self.train_config["train_batch_size"],
             shuffle=True,
             num_workers=self.train_config["dataloader_num_workers"],
-            pin_memory=torch.cuda.is_available(),
             collate_fn=collate_manifest_batch,
         )
 
@@ -135,14 +136,12 @@ class BaseDiffusionTrainer:
         return get_scheduler(
             self.train_config["lr_scheduler"],
             optimizer=optimizer,
-            num_warmup_steps=self.train_config["lr_warmup_steps"],
-            num_training_steps=self.train_config["max_train_steps"],
+            num_warmup_steps=self.train_config["lr_warmup_steps"] * self.accelerator.num_processes,
+            num_training_steps=self.train_config["max_train_steps"] * self.accelerator.num_processes,
         )
 
     def initialize_trackers(self) -> None:
-        if self._trackers_initialized or not self.accelerator.is_main_process:
-            return
-        if self.logging_config["report_to"] == "none":
+        if self._trackers_initialized or not self.accelerator.is_main_process or not self._logging_enabled:
             return
         tracker_config: dict[str, Any] = {}
         flatten_config("", self.config, tracker_config)
@@ -156,22 +155,21 @@ class BaseDiffusionTrainer:
         resume_value = self.train_config.get("resume_from_checkpoint")
         if not resume_value:
             return None, {}
-
+        checkpoint_path = Path(resume_value)
         if resume_value == "latest":
             candidates = sorted(
                 self.checkpoint_dir.glob("checkpoint-*"),
                 key=lambda path: int(path.name.split("-", 1)[1]),
             )
             if not candidates:
-                return None, {}
+                raise FileNotFoundError(
+                    f"resume_from_checkpoint=latest requested, but no checkpoints exist under {self.checkpoint_dir}"
+                )
             checkpoint_path = candidates[-1]
-        else:
-            checkpoint_path = Path(resume_value)
-            if not checkpoint_path.is_absolute():
-                checkpoint_path = self.checkpoint_dir / checkpoint_path
-            if not checkpoint_path.exists():
-                raise FileNotFoundError(f"Checkpoint does not exist: {checkpoint_path}")
-
+        elif not checkpoint_path.is_absolute():
+            checkpoint_path = self.checkpoint_dir / checkpoint_path
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Checkpoint does not exist: {checkpoint_path}")
         metadata_path = checkpoint_path / "checkpoint_state.json"
         metadata: dict[str, Any] = {}
         if metadata_path.exists():
@@ -180,7 +178,6 @@ class BaseDiffusionTrainer:
 
     def save_training_checkpoint(
         self,
-        *,
         global_step: int,
         epoch: int,
         dataloader_step: int,
@@ -200,7 +197,6 @@ class BaseDiffusionTrainer:
                 checkpoint_path / "checkpoint_state.json",
             )
             self.prune_checkpoints()
-        self.accelerator.wait_for_everyone()
 
     def prune_checkpoints(self) -> None:
         checkpoints_total_limit = self.train_config.get("checkpoints_total_limit")
@@ -214,13 +210,15 @@ class BaseDiffusionTrainer:
             old_checkpoint = checkpoints.pop(0)
             shutil.rmtree(old_checkpoint, ignore_errors=True)
 
-    def _log_validation(self, phase_name: str, epoch: int, global_step: int) -> None:
+    def log_validation(self, phase_name: str, epoch: int, global_step: int) -> None:
+        self.accelerator.wait_for_everyone()
         prompt = self.validation_config.get("validation_prompt")
         num_images = self.validation_config.get("num_validation_images", 0)
         if not prompt or num_images <= 0 or not self.accelerator.is_main_process:
+            self.accelerator.wait_for_everyone()
             return
 
-        if type(self.adapter).generate_validation_images is not BaseModelAdapter.generate_validation_images:
+        if hasattr(self.adapter, "generate_validation_images"):
             images = self.adapter.generate_validation_images(
                 self.accelerator,
                 prompt=prompt,
@@ -234,91 +232,80 @@ class BaseDiffusionTrainer:
                 generator = torch.Generator(device=self.accelerator.device).manual_seed(
                     self.train_config["seed"]
                 )
+            autocast_dtype = torch.float16 if self.accelerator.mixed_precision == "fp16" else torch.bfloat16
             autocast_context = (
-                torch.autocast(self.accelerator.device.type, dtype=self.weight_dtype)
+                torch.autocast(self.accelerator.device.type, dtype=autocast_dtype)
                 if self.accelerator.device.type != "cpu"
-                and self.weight_dtype in {torch.float16, torch.bfloat16}
+                and self.accelerator.mixed_precision in {"fp16", "bf16"}
                 else nullcontext()
             )
             with autocast_context:
                 images = [
-                    pipeline(prompt=prompt, num_inference_steps=30, generator=generator).images[0]
+                    pipeline(
+                        prompt=prompt,
+                        num_inference_steps=self.adapter.get_validation_inference_steps(),
+                        generator=generator,
+                    ).images[0]
                     for _ in range(num_images)
                 ]
             del pipeline
             if self.accelerator.device.type == "cuda":
                 torch.cuda.empty_cache()
 
-        self.accelerator.log(
-            {
-                f"{phase_name}/epoch": epoch + 1,
-                f"{phase_name}/global_step": global_step,
-            },
-            step=global_step,
-        )
-        import swanlab
-
+        if self._logging_enabled:
+            self.accelerator.log(
+                {
+                    f"{phase_name}/epoch": epoch + 1,
+                    f"{phase_name}/global_step": global_step,
+                },
+                step=global_step,
+            )
         for tracker in self.accelerator.trackers:
             if tracker.name == "swanlab":
-                tracker.log(
-                    {
-                        f"{phase_name}/prompt": swanlab.Text(prompt),
-                        f"{phase_name}/images": [
-                            swanlab.Image(image, caption=f"{index}: {prompt}")
-                            for index, image in enumerate(images)
-                        ],
-                    },
-                    step=global_step,
-                )
+                tracker.log({f"{phase_name}/prompt": prompt}, step=global_step)
+                tracker.log_images({f"{phase_name}/images": images}, step=global_step)
+        self.accelerator.wait_for_everyone()
 
     def train(self) -> Path:
         self.adapter.setup(self.accelerator, self.weight_dtype)
         train_dataloader = self.build_dataloader()
         optimizer = self.build_optimizer()
-        self.adapter.register_checkpointing_hooks(self.accelerator)
+        lr_scheduler = self.build_lr_scheduler(optimizer)
 
         prepared_modules = self.adapter.get_models_for_accelerator_prepare()
-        prepared = self.accelerator.prepare(*prepared_modules, optimizer, train_dataloader)
+        prepared = self.accelerator.prepare(*prepared_modules, optimizer, train_dataloader, lr_scheduler)
         prepared_models = prepared[: len(prepared_modules)]
         optimizer = prepared[len(prepared_modules)]
         train_dataloader = prepared[len(prepared_modules) + 1]
+        lr_scheduler = prepared[len(prepared_modules) + 2]
         self.adapter.set_prepared_models(tuple(prepared_models))
+        self.adapter.register_checkpointing_hooks(self.accelerator)
 
-        steps_per_epoch = math.ceil(len(train_dataloader) / self.train_config["gradient_accumulation_steps"])
-        max_train_steps = self.train_config.get("max_train_steps")
-        if max_train_steps is None:
-            max_train_steps = self.train_config["num_train_epochs"] * steps_per_epoch
-
-        lr_scheduler = self.build_lr_scheduler(optimizer)
         self.initialize_trackers()
 
-        resume_checkpoint, resume_metadata = self.resolve_resume_checkpoint()
-        global_step = int(resume_metadata.get("global_step", 0))
-        first_epoch = int(resume_metadata.get("epoch", 0))
-        resume_dataloader_step = int(resume_metadata.get("dataloader_step", -1))
-        if resume_checkpoint is not None:
-            self.accelerator.print(f"Resuming from checkpoint {resume_checkpoint}")
-            self.accelerator.load_state(str(resume_checkpoint))
+        global_step = 0
+        first_epoch = 0
+        resume_dataloader_step = -1
+        checkpoint_path, checkpoint_metadata = self.resolve_resume_checkpoint()
+        if checkpoint_path is not None:
+            self.accelerator.print(f"Resuming from checkpoint {checkpoint_path}")
+            self.accelerator.load_state(str(checkpoint_path))
             self.adapter.on_checkpoint_loaded(self.accelerator)
+            global_step = int(checkpoint_metadata.get("global_step", 0))
+            first_epoch = int(checkpoint_metadata.get("epoch", 0))
+            resume_dataloader_step = int(checkpoint_metadata.get("dataloader_step", -1))
 
         progress_bar = tqdm(
-            total=max_train_steps,
+            total=self.train_config["max_train_steps"],
             initial=global_step,
             disable=not self.accelerator.is_local_main_process,
             desc="train",
         )
-
         loss_history: list[float] = []
         train_loss = 0.0
-        epoch = first_epoch
+
         for epoch in range(first_epoch, self.train_config["num_train_epochs"]):
-            progress = tqdm(
-                train_dataloader,
-                desc=f"epoch={epoch}",
-                leave=False,
-                disable=not self.accelerator.is_local_main_process,
-            )
-            for dataloader_step, batch in enumerate(progress):
+            for dataloader_step, batch in enumerate(train_dataloader):
                 if epoch == first_epoch and dataloader_step <= resume_dataloader_step:
                     continue
 
@@ -341,28 +328,30 @@ class BaseDiffusionTrainer:
                     target = self.adapter.build_target(clean_latents, noise, time_state, batch)
                     loss = self.adapter.compute_loss(prediction, target, time_state, batch)
 
-                    avg_loss = self.accelerator.gather(loss.detach().float()).mean()
-                    loss_history.append(avg_loss.item())
+                    avg_loss = self.accelerator.gather(
+                        loss.detach().repeat(clean_latents.shape[0])
+                    ).mean()
                     train_loss += avg_loss.item() / self.accelerator.gradient_accumulation_steps
 
-                    self.accelerator.backward(loss / self.accelerator.gradient_accumulation_steps)
+                    self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
                         self.accelerator.clip_grad_norm_(
                             list(self.adapter.get_grad_clip_parameters()),
                             self.train_config["max_grad_norm"],
                         )
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad(set_to_none=True)
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad(set_to_none=True)
 
                 if not self.accelerator.sync_gradients:
                     continue
 
                 global_step += 1
                 progress_bar.update(1)
-                progress.set_postfix(loss=f"{avg_loss.item():.4f}", lr=f"{lr_scheduler.get_last_lr()[0]:.2e}")
+                loss_history.append(avg_loss.item())
+                progress_bar.set_postfix(loss=f"{avg_loss.item():.4f}")
 
-                if self.accelerator.is_main_process:
+                if self._logging_enabled:
                     self.accelerator.log(
                         {
                             "train/loss": train_loss,
@@ -378,28 +367,23 @@ class BaseDiffusionTrainer:
                     self.accelerator.print(f"step={global_step} loss={avg_loss.item():.6f}")
 
                 if global_step % self.train_config["checkpointing_steps"] == 0:
-                    self.save_training_checkpoint(
-                        global_step=global_step,
-                        epoch=epoch,
-                        dataloader_step=dataloader_step,
-                    )
+                    self.save_training_checkpoint(global_step, epoch, dataloader_step)
 
-                if global_step >= max_train_steps:
+                if global_step >= self.train_config["max_train_steps"]:
                     break
 
-            if global_step >= max_train_steps:
+            if global_step >= self.train_config["max_train_steps"]:
                 break
 
             if (
                 self.validation_config.get("validation_prompt") is not None
-                and self.validation_config["validation_epochs"] > 0
                 and (epoch + 1) % self.validation_config["validation_epochs"] == 0
             ):
-                self._log_validation("validation", epoch, global_step)
+                self.log_validation("validation", epoch, global_step)
 
         self.accelerator.wait_for_everyone()
-        self._log_validation("test", epoch, global_step)
-        self.accelerator.wait_for_everyone()
+        if self.validation_config.get("validation_prompt") is not None:
+            self.log_validation("test", epoch if "epoch" in locals() else 0, global_step)
 
         final_checkpoint = self.checkpoint_dir / "final_lora"
         if self.accelerator.is_main_process:
@@ -414,6 +398,5 @@ class BaseDiffusionTrainer:
                 "final_checkpoint": str(final_checkpoint),
             }
             write_json(summary, self.output_dir / "train_summary.json")
-
         self.accelerator.end_training()
         return final_checkpoint

@@ -111,6 +111,9 @@ class BaseModelAdapter(ABC):
     def on_checkpoint_loaded(self, accelerator: Accelerator) -> None:
         return None
 
+    def get_validation_inference_steps(self) -> int:
+        return 30
+
     def validate_conditioning(self, conditioning: Conditioning) -> None:
         if conditioning.prompt_embeds is None:
             raise ValueError("prompt_embeds must not be None.")

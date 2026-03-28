@@ -28,6 +28,7 @@
 - `train.checkpointing_steps`
 - `train.resume_from_checkpoint`
 - `train.optimizer.*`
+  - `train.optimizer.use_8bit_adam` is currently unsupported and must remain `false`
 - `train.lora.rank`
 - `train.lora.alpha`
 - `train.lora.dropout`
@@ -38,10 +39,13 @@
 - `logging.report_to`
 - `logging.logging_dir`
 - `logging.log_every_n_steps`
+- `logging.tracker_project_name`
 - `distributed.ddp_backend`
+  - currently fixed to `nccl`
 - `distributed.find_unused_parameters`
+- `distributed.local_rank`
 
-`bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`.
+`bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`, for example `bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2`.
 
 `infer` config:
 
