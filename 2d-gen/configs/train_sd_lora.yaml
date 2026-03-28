@@ -1,0 +1,38 @@
+model:
+  family: stable_diffusion
+  pretrained_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-v1-5
+  revision: null
+  local_files_only: true
+
+data:
+  train_manifest: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-png/LiTS2017/train.jsonl
+
+train:
+  output_dir: outputs/sd_lora
+  num_epochs: 10
+  batch_size: 1
+  learning_rate: 1.0e-4
+  max_train_steps: 4000
+  gradient_accumulation_steps: 32
+  mixed_precision: fp16
+  seed: 3407
+  image_size: 512
+  num_workers: 2
+  log_every_n_steps: 5
+  save_every_n_steps: 400
+  lora_rank: 16
+  lora_alpha: 16
+  lora_dropout: 0.0
+  target_modules:
+    - attn.to_k
+    - attn.to_q
+    - attn.to_v
+    - attn.to_out.0
+    - attn.add_k_proj
+    - attn.add_q_proj
+    - attn.add_v_proj
+    - attn.to_add_out
+    - ff.net.0.proj
+    - ff.net.2
+    - ff_context.net.0.proj
+    - ff_context.net.2

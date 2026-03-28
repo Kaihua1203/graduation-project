@@ -3,6 +3,10 @@
 ## Project Structure & Module Organization
 See `ARCHITECTURE.md` for the current repository layout and module map.
 
+## Project Environment Rules
+- Before starting implementation work, first align with the user on which project environment or `venv` should be used. Do not assume the environment if the user has not specified it.
+- After planning and before writing code, verify the selected environment for dependency, version, and runtime compatibility. Resolve version conflicts or incompatibilities first, then start development.
+
 ## Coding Style & Naming Conventions
 - Python code uses 4-space indentation and standard PEP 8 naming.
 - Use `snake_case` for functions/variables, `PascalCase` for classes.
@@ -45,12 +49,6 @@ Read in order:
 4. `docs/diffusers/sdxl.md`
 5. `docs/diffusers/flux.md`
 6. `docs/diffusers/qwenimage.md`
-
-Model-specific drill-down:
-- Start with `stable_diffusion.md` when building the first trainer skeleton or validating the baseline latent diffusion path.
-- Read `sdxl.md` next when adding dual-encoder conditioning, pooled text embeddings, and `time_ids`.
-- Read `flux.md` when switching to transformer-based denoisers, packed latents, and flow-matching style time handling.
-- Read `qwenimage.md` when adding Qwen prompt templating, prompt masks, and QwenImage-specific packed latent training logic.
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the read tool (use offset + limit for ranged reads).
