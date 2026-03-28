@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from common.config import load_yaml_config
+from common.config import load_yaml_config, normalize_training_config
 from data.dataset import ManifestImagePromptDataset
 
 
@@ -18,6 +18,47 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
             config_path.write_text("model:\n  family: stable_diffusion\n", encoding="utf-8")
             config = load_yaml_config(config_path)
             self.assertEqual(config["model"]["family"], "stable_diffusion")
+
+    def test_normalize_training_config(self) -> None:
+        raw_config = {
+            "model": {
+                "family": "stable_diffusion",
+                "pretrained_model_name_or_path": "/tmp/model",
+            },
+            "data": {
+                "train_manifest": "/tmp/train.jsonl",
+                "resolution": 256,
+            },
+            "train": {
+                "output_dir": "outputs/test",
+                "train_batch_size": 1,
+                "num_train_epochs": 1,
+                "max_train_steps": 1,
+                "gradient_accumulation_steps": 1,
+                "learning_rate": 1.0e-4,
+                "mixed_precision": "fp16",
+                "seed": 3407,
+                "dataloader_num_workers": 0,
+                "checkpointing_steps": 10,
+                "optimizer": {},
+                "lora": {
+                    "rank": 4,
+                    "alpha": 8,
+                    "dropout": 0.0,
+                    "target_modules": ["to_q"],
+                },
+                "sdxl": {},
+            },
+        }
+
+        normalized = normalize_training_config(raw_config)
+        self.assertEqual(normalized["model"]["pretrained_path"], "/tmp/model")
+        self.assertEqual(normalized["train"]["batch_size"], 1)
+        self.assertEqual(normalized["train"]["num_epochs"], 1)
+        self.assertEqual(normalized["train"]["image_size"], 256)
+        self.assertEqual(normalized["train"]["save_every_n_steps"], 10)
+        self.assertEqual(normalized["validation"]["num_validation_images"], 4)
+        self.assertEqual(normalized["logging"]["report_to"], "swanlab")
 
     def test_manifest_dataset(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
