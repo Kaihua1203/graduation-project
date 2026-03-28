@@ -180,7 +180,6 @@ class BaseDiffusionTrainer:
         self,
         global_step: int,
         epoch: int,
-        dataloader_step: int,
     ) -> None:
         checkpoint_path = self.checkpoint_dir / f"checkpoint-{global_step}"
         if self.accelerator.is_main_process:
@@ -192,7 +191,6 @@ class BaseDiffusionTrainer:
                 {
                     "global_step": global_step,
                     "epoch": epoch,
-                    "dataloader_step": dataloader_step,
                 },
                 checkpoint_path / "checkpoint_state.json",
             )
@@ -285,7 +283,6 @@ class BaseDiffusionTrainer:
 
         global_step = 0
         first_epoch = 0
-        resume_dataloader_step = -1
         checkpoint_path, checkpoint_metadata = self.resolve_resume_checkpoint()
         if checkpoint_path is not None:
             self.accelerator.print(f"Resuming from checkpoint {checkpoint_path}")
@@ -293,7 +290,6 @@ class BaseDiffusionTrainer:
             self.adapter.on_checkpoint_loaded(self.accelerator)
             global_step = int(checkpoint_metadata.get("global_step", 0))
             first_epoch = int(checkpoint_metadata.get("epoch", 0))
-            resume_dataloader_step = int(checkpoint_metadata.get("dataloader_step", -1))
 
         progress_bar = tqdm(
             total=self.train_config["max_train_steps"],
@@ -305,10 +301,7 @@ class BaseDiffusionTrainer:
         train_loss = 0.0
 
         for epoch in range(first_epoch, self.train_config["num_train_epochs"]):
-            for dataloader_step, batch in enumerate(train_dataloader):
-                if epoch == first_epoch and dataloader_step <= resume_dataloader_step:
-                    continue
-
+            for batch in train_dataloader:
                 with self.accelerator.accumulate(self.adapter.get_accumulate_target()):
                     conditioning = self.adapter.encode_text(batch, self.accelerator.device, self.weight_dtype)
                     clean_latents = self.adapter.encode_latents(batch, self.accelerator.device, self.weight_dtype)
@@ -367,7 +360,7 @@ class BaseDiffusionTrainer:
                     self.accelerator.print(f"step={global_step} loss={avg_loss.item():.6f}")
 
                 if global_step % self.train_config["checkpointing_steps"] == 0:
-                    self.save_training_checkpoint(global_step, epoch, dataloader_step)
+                    self.save_training_checkpoint(global_step, epoch)
 
                 if global_step >= self.train_config["max_train_steps"]:
                     break

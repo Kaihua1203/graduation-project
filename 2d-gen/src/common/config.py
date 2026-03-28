@@ -105,9 +105,7 @@ def normalize_train_config(config: Dict[str, Any]) -> Dict[str, Any]:
             "tracker_project_name": str(logging.get("tracker_project_name", "2d-gen-train")),
         },
         "distributed": {
-            "ddp_backend": str(distributed.get("ddp_backend", "nccl")),
             "find_unused_parameters": bool(distributed.get("find_unused_parameters", False)),
-            "local_rank": int(distributed.get("local_rank", -1)),
         },
     }
 
@@ -203,8 +201,6 @@ def _validate_train_config(config: Dict[str, Any]) -> None:
         raise ValueError("validation.num_validation_images must be positive.")
     if config["validation"]["validation_epochs"] <= 0:
         raise ValueError("validation.validation_epochs must be positive.")
-    if config["distributed"]["ddp_backend"] != "nccl":
-        raise ValueError("distributed.ddp_backend is currently fixed to 'nccl'.")
     if config["train"]["optimizer"]["use_8bit_adam"]:
         raise ValueError("train.optimizer.use_8bit_adam is not implemented in the current trainer.")
 

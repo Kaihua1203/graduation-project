@@ -40,12 +40,9 @@
 - `logging.logging_dir`
 - `logging.log_every_n_steps`
 - `logging.tracker_project_name`
-- `distributed.ddp_backend`
-  - currently fixed to `nccl`
 - `distributed.find_unused_parameters`
-- `distributed.local_rank`
 
-`bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`, for example `bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2`.
+`bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`, for example `bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2`. Distributed launcher settings should be passed via `accelerate launch`, not stored in the YAML config.
 
 `infer` config:
 

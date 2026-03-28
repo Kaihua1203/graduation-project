@@ -79,6 +79,4 @@ logging:
   tracker_project_name: 2d-gen-train
 
 distributed:
-  ddp_backend: nccl
   find_unused_parameters: false
-  local_rank: -1

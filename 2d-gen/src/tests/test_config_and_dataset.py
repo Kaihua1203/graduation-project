@@ -55,7 +55,7 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
         self.assertEqual(normalized["data"]["resolution"], 256)
         self.assertEqual(normalized["validation"]["num_validation_images"], 4)
         self.assertEqual(normalized["logging"]["report_to"], "swanlab")
-        self.assertEqual(normalized["distributed"]["local_rank"], -1)
+        self.assertFalse(normalized["distributed"]["find_unused_parameters"])
 
     def test_load_train_config_rejects_legacy_schema(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -114,7 +114,6 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
                 },
                 "sdxl": {},
             },
-            "distributed": {"ddp_backend": "gloo"},
         }
 
         with self.assertRaises(ValueError):
