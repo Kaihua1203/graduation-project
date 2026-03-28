@@ -17,12 +17,21 @@ except ModuleNotFoundError:
 
 def make_config() -> dict:
     return {
-        "model": {"family": "stable_diffusion", "pretrained_path": "/tmp/model"},
+        "model": {
+            "family": "stable_diffusion",
+            "pretrained_model_name_or_path": "/tmp/model",
+            "local_files_only": True,
+        },
         "train": {
-            "lora_rank": 4,
-            "lora_alpha": 8,
-            "lora_dropout": 0.0,
-            "target_modules": ["to_q"],
+            "gradient_checkpointing": False,
+            "prediction_type": None,
+            "enable_xformers_memory_efficient_attention": False,
+            "lora": {
+                "rank": 4,
+                "alpha": 8,
+                "dropout": 0.0,
+                "target_modules": ["to_q"],
+            },
         },
     }
 

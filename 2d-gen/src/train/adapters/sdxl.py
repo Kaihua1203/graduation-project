@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import torch
+from accelerate import Accelerator
 
 from common.types import Conditioning, TimeState
 from train.adapters.base import BaseModelAdapter
 
 
 class SDXLAdapter(BaseModelAdapter):
-    def setup(self, device: torch.device) -> None:
+    def setup(self, accelerator: Accelerator, weight_dtype: torch.dtype) -> None:
         raise NotImplementedError("SDXL training adapter is the next milestone.")
+
+    def get_models_for_accelerator_prepare(self) -> tuple[torch.nn.Module, ...]:
+        raise NotImplementedError
+
+    def set_prepared_models(self, prepared_models: tuple[torch.nn.Module, ...]) -> None:
+        raise NotImplementedError
+
+    def get_accumulate_target(self) -> torch.nn.Module:
+        raise NotImplementedError
 
     def get_trainable_parameters(self) -> list[torch.nn.Parameter]:
         raise NotImplementedError
@@ -59,8 +70,17 @@ class SDXLAdapter(BaseModelAdapter):
     ) -> torch.Tensor:
         raise NotImplementedError
 
-    def save_checkpoint(self, output_dir: str) -> None:
+    def build_validation_pipeline(self, accelerator: Accelerator):
         raise NotImplementedError
+
+    def save_checkpoint(self, output_dir: str | Path, accelerator: Accelerator | None = None) -> None:
+        raise NotImplementedError
+
+    def load_checkpoint(self, input_dir: str | Path, accelerator: Accelerator) -> None:
+        raise NotImplementedError
+
+    def on_checkpoint_loaded(self, accelerator: Accelerator) -> None:
+        return None
 
     def validate_conditioning(self, conditioning: Conditioning) -> None:
         super().validate_conditioning(conditioning)

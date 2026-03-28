@@ -5,7 +5,8 @@ diffusers>=0.37.1
 numpy>=2.2.6
 peft>=0.18.1
 scipy>=1.15.3
+swanlab>=0.7.13
 torch>=2.11.0
 torchvision>=0.26.0
-transformers>=5.4.0
+transformers>=4.57.3
 tqdm

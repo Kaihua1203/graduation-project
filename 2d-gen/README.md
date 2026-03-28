@@ -72,6 +72,7 @@ The current `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers` snaps
 - `transformers>=4.57.3`
 - `peft>=0.18.1`
 - `accelerate>=1.13.0`
+- `swanlab>=0.7.13`
 - `numpy>=2.2.6`
 - `scipy>=1.15.3`
 - `Pillow>=12.1.1`
@@ -93,6 +94,27 @@ bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 bash scripts/run_infer.sh configs/infer_sd_example.yaml
 bash scripts/run_eval.sh configs/eval_example.yaml
 ```
+
+`scripts/run_train.sh` now wraps `accelerate launch`. Pass extra launcher arguments after the config path:
+
+```bash
+bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2
+```
+
+The train config follows a diffusers-style schema with top-level `model`, `data`, `train`, `validation`, `logging`, and `distributed` sections. Legacy keys such as `model.pretrained_path`, `train.batch_size`, and `train.num_epochs` are rejected.
+
+Validation is controlled by:
+
+- `validation.validation_prompt`
+- `validation.num_validation_images`
+- `validation.validation_epochs`
+
+When `logging.report_to: swanlab`, training logs include scalar metrics plus validation images and their prompt.
+
+Current runtime limits:
+
+- `distributed.ddp_backend` must remain `nccl`
+- `train.optimizer.use_8bit_adam` is parsed but intentionally rejected for now
 
 Build a training manifest from single-level `images/` and `prompts/` directories:
 
