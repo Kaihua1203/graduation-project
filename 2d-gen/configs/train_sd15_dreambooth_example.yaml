@@ -1,0 +1,71 @@
+model:
+  pretrained_model_name_or_path: /abs/path/to/stable-diffusion-v1-5
+  pretrained_vae_model_name_or_path: null
+  revision: null
+  variant: null
+  local_files_only: true
+
+data:
+  instance_data_dir: /abs/path/to/instance_images
+  instance_prompt: photo of tok organ
+  class_data_dir: /abs/path/to/class_images
+  class_prompt: photo of an organ
+  with_prior_preservation: true
+  num_class_images: 100
+  resolution: 512
+  center_crop: false
+  image_interpolation_mode: lanczos
+
+train:
+  output_dir: outputs/sd15_dreambooth_example
+  seed: 3407
+  train_batch_size: 1
+  sample_batch_size: 4
+  num_train_epochs: 1
+  max_train_steps: 100
+  checkpointing_steps: 50
+  checkpoints_total_limit: 2
+  resume_from_checkpoint: null
+  gradient_accumulation_steps: 1
+  gradient_checkpointing: false
+  learning_rate: 5.0e-4
+  scale_lr: false
+  lr_scheduler: constant
+  lr_warmup_steps: 0
+  lr_num_cycles: 1
+  lr_power: 1.0
+  dataloader_num_workers: 2
+  max_grad_norm: 1.0
+  allow_tf32: false
+  mixed_precision: fp16
+  prior_generation_precision: fp16
+  enable_xformers_memory_efficient_attention: false
+  noise_offset: 0.0
+  prior_loss_weight: 1.0
+  snr_gamma: null
+  optimizer:
+    use_8bit_adam: false
+    adam_beta1: 0.9
+    adam_beta2: 0.999
+    adam_weight_decay: 1.0e-2
+    adam_epsilon: 1.0e-8
+  lora:
+    rank: 8
+    alpha: 8
+    dropout: 0.0
+    target_modules:
+      - to_k
+      - to_q
+      - to_v
+      - to_out.0
+
+validation:
+  validation_prompt: photo of tok organ on ct slice
+  num_validation_images: 2
+  validation_epochs: 1
+
+logging:
+  report_to: none
+  logging_dir: logs
+  log_every_n_steps: 10
+  tracker_project_name: 2d-gen-dreambooth-sd15
