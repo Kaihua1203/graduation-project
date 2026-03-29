@@ -198,7 +198,7 @@ def make_minimal_config(output_dir: Path) -> dict[str, object]:
         "validation": {
             "validation_prompt": "a liver CT slice",
             "num_validation_images": 2,
-            "validation_epochs": 1,
+            "validation_steps": 1,
         },
         "logging": {
             "report_to": "swanlab",
@@ -322,6 +322,42 @@ class TrainerLoggingSmokeTest(unittest.TestCase):
                 trainer = BaseDiffusionTrainer(config)
                 with self.assertRaisesRegex(ValueError, "Training dataloader is empty"):
                     trainer.train()
+
+    def test_train_runs_validation_on_validation_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "outputs"
+            config = make_minimal_config(output_dir)
+            config["train"]["max_train_steps"] = 3
+            config["train"]["optimizer"] = {
+                "adam_beta1": 0.9,
+                "adam_beta2": 0.999,
+                "adam_weight_decay": 1.0e-2,
+                "adam_epsilon": 1.0e-8,
+            }
+            config["train"]["lr_scheduler"] = "constant"
+            config["train"]["lr_warmup_steps"] = 0
+            config["train"]["checkpointing_steps"] = 10
+            config["train"]["max_grad_norm"] = 1.0
+            config["validation"]["validation_steps"] = 2
+            config["logging"]["report_to"] = "none"
+
+            batches = [
+                {"pixel_values": torch.zeros(1, 3, 8, 8), "prompt": ["a"], "image_path": ["a.png"]},
+                {"pixel_values": torch.zeros(1, 3, 8, 8), "prompt": ["b"], "image_path": ["b.png"]},
+            ]
+
+            with patch.object(base_trainer, "Accelerator", FakeAccelerator), patch.object(
+                base_trainer, "resolve_adapter_class", return_value=DummyTrainAdapter
+            ), patch.object(BaseDiffusionTrainer, "build_dataloader", return_value=batches), patch.object(
+                BaseDiffusionTrainer, "log_validation"
+            ) as log_validation:
+                trainer = BaseDiffusionTrainer(config)
+                trainer.train()
+
+            self.assertEqual(
+                [call.args for call in log_validation.call_args_list],
+                [("validation", 0, 2), ("test", 1, 3)],
+            )
 
 
 class RunTrainScriptSmokeTest(unittest.TestCase):

@@ -344,7 +344,7 @@ def _make_config(output_dir: Path, family: str) -> dict[str, object]:
         "validation": {
             "validation_prompt": None,
             "num_validation_images": 1,
-            "validation_epochs": 1,
+            "validation_steps": 1,
         },
         "logging": {
             "report_to": "none",

@@ -70,14 +70,13 @@ train:
 validation:
   validation_prompt: a photo of abdomen CT scans image, with liver, liver tumor.
   num_validation_images: 4
-  validation_epochs: 1
+  validation_steps: 400
 
 logging:
   report_to: swanlab
   logging_dir: logs
-  log_every_n_steps: 1
-  tracker_project_name: 2d-gen
-  # tracker_experiment_name: "sd-train"
+  project_name: 2d-gen
+  experiment_name: "sd-train"
 
 distributed:
   find_unused_parameters: true

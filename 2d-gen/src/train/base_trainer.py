@@ -395,17 +395,17 @@ class BaseDiffusionTrainer:
                 if global_step % self.train_config["checkpointing_steps"] == 0:
                     self.save_training_checkpoint(global_step, epoch)
 
+                if (
+                    self.validation_config.get("validation_prompt") is not None
+                    and global_step % self.validation_config["validation_steps"] == 0
+                ):
+                    self.log_validation("validation", epoch, global_step)
+
                 if global_step >= max_train_steps:
                     break
 
             if global_step >= max_train_steps:
                 break
-
-            if (
-                self.validation_config.get("validation_prompt") is not None
-                and (epoch + 1) % self.validation_config["validation_epochs"] == 0
-            ):
-                self.log_validation("validation", epoch, global_step)
 
         self.accelerator.wait_for_everyone()
         if self.validation_config.get("validation_prompt") is not None:

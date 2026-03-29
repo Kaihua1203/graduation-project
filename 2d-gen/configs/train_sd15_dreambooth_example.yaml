@@ -62,7 +62,7 @@ train:
 validation:
   validation_prompt: photo of tok organ on ct slice
   num_validation_images: 2
-  validation_epochs: 1
+  validation_steps: 50
 
 logging:
   report_to: swanlab

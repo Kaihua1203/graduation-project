@@ -70,7 +70,7 @@ train:
 validation:
   validation_prompt: a photo of abdomen CT scans image, with liver.
   num_validation_images: 4
-  validation_epochs: 1
+  validation_steps: 400
 
 logging:
   report_to: swanlab

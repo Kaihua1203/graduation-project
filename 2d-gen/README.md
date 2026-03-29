@@ -118,7 +118,7 @@ Validation is controlled by:
 
 - `validation.validation_prompt`
 - `validation.num_validation_images`
-- `validation.validation_epochs`
+- `validation.validation_steps`
 
 When `logging.report_to: swanlab`, training logs include scalar metrics plus validation images. Use `logging.project_name` and `logging.experiment_name` to name the SwanLab project and run.
 

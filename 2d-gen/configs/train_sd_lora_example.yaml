@@ -62,7 +62,7 @@ train:
 validation:
   validation_prompt: null
   num_validation_images: 4
-  validation_epochs: 1
+  validation_steps: 20
 
 logging:
   report_to: swanlab

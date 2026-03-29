@@ -42,6 +42,7 @@ def normalize_train_config(config: Dict[str, Any]) -> Dict[str, Any]:
     ):
         if not isinstance(section_value, dict):
             raise ValueError(f"Section '{section_name}' must be a mapping.")
+    _reject_legacy_validation_schema(validation)
 
     normalized = {
         "model": {
@@ -94,7 +95,7 @@ def normalize_train_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "validation": {
             "validation_prompt": validation.get("validation_prompt"),
             "num_validation_images": int(validation.get("num_validation_images", 4)),
-            "validation_epochs": int(validation.get("validation_epochs", 1)),
+            "validation_steps": int(validation.get("validation_steps", 1)),
         },
         "logging": {
             "report_to": str(logging.get("report_to", "swanlab")),
@@ -153,6 +154,11 @@ def _normalize_sdxl_config(value: Any) -> Dict[str, Any]:
     }
 
 
+def _reject_legacy_validation_schema(validation: Dict[str, Any]) -> None:
+    if "validation_epochs" in validation:
+        raise ValueError("validation.validation_epochs is no longer supported. Use validation.validation_steps.")
+
+
 def _require_string(section: Dict[str, Any], key: str) -> str:
     value = section.get(key)
     if not isinstance(value, str) or not value.strip():
@@ -196,8 +202,8 @@ def _validate_train_config(config: Dict[str, Any]) -> None:
         raise ValueError("train.num_train_epochs must be positive.")
     if config["validation"]["num_validation_images"] <= 0:
         raise ValueError("validation.num_validation_images must be positive.")
-    if config["validation"]["validation_epochs"] <= 0:
-        raise ValueError("validation.validation_epochs must be positive.")
+    if config["validation"]["validation_steps"] <= 0:
+        raise ValueError("validation.validation_steps must be positive.")
     if config["train"]["optimizer"]["use_8bit_adam"]:
         raise ValueError("train.optimizer.use_8bit_adam is not implemented in the current trainer.")
 

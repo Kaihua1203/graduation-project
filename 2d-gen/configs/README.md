@@ -35,7 +35,7 @@
 - `train.lora.target_modules`
 - `validation.validation_prompt`
 - `validation.num_validation_images`
-- `validation.validation_epochs`
+- `validation.validation_steps`
 - `logging.report_to`
 - `logging.logging_dir`
 - `logging.project_name`
@@ -97,7 +97,7 @@
 - `train.lora.target_modules`
 - `validation.validation_prompt`
 - `validation.num_validation_images`
-- `validation.validation_epochs`
+- `validation.validation_steps`
 - `logging.report_to`
 - `logging.logging_dir`
 - `logging.project_name`

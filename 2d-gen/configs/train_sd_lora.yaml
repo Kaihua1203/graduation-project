@@ -46,8 +46,8 @@ train:
     adam_weight_decay: 1.0e-2
     adam_epsilon: 1.0e-8
   lora:
-    rank: 16
-    alpha: 16
+    rank: 32
+    alpha: 32
     dropout: 0.0
     target_modules:
       - attn.to_k
@@ -70,14 +70,13 @@ train:
 validation:
   validation_prompt: a photo of abdomen CT scans image, with liver.
   num_validation_images: 4
-  validation_epochs: 1
+  validation_steps: 400
 
 logging:
   report_to: swanlab
   logging_dir: logs
   project_name: 2d-gen
   experiment_name: train_sd_lora
-  # experiment_name: sd-train
 
 distributed:
   find_unused_parameters: true

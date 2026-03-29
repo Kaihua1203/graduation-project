@@ -64,16 +64,55 @@ class DreamBoothSd15SmokeTest(unittest.TestCase):
             self.assertEqual(config["train"]["max_train_steps"], 2)
             self.assertEqual(config["train"]["mixed_precision"], "no")
 
+    def test_load_config_rejects_validation_epochs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            model_dir = root / "model"
+            instance_dir = root / "instance"
+            class_dir = root / "class"
+            model_dir.mkdir()
+            instance_dir.mkdir()
+            class_dir.mkdir()
+
+            config_path = root / "dreambooth.yaml"
+            config_path.write_text(
+                textwrap.dedent(
+                    f"""
+                    model:
+                      pretrained_model_name_or_path: {model_dir}
+                    data:
+                      instance_data_dir: {instance_dir}
+                      instance_prompt: photo of tok sample
+                      class_data_dir: {class_dir}
+                      class_prompt: photo of a sample
+                      with_prior_preservation: true
+                    train:
+                      output_dir: {root / "outputs"}
+                      max_train_steps: 2
+                      lora:
+                        target_modules: [to_k, to_q]
+                    validation:
+                      validation_epochs: 1
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "validation\\.validation_epochs"):
+                load_dreambooth_config(config_path)
+
     def test_validation_schedule_ignores_tracker_choice(self) -> None:
         config = {
             "validation": {
                 "validation_prompt": "photo of tok sample",
-                "validation_epochs": 1,
+                "validation_steps": 2,
                 "num_validation_images": 1,
             },
             "logging": {"report_to": "none"},
         }
-        self.assertTrue(should_run_validation(config, epoch=0))
+        self.assertFalse(should_run_validation(config, global_step=1))
+        self.assertTrue(should_run_validation(config, global_step=2))
 
     def test_prior_generation_fp16_falls_back_to_fp32_on_cpu(self) -> None:
         accelerator = SimpleNamespace(device=torch.device("cpu"))
@@ -135,7 +174,7 @@ class DreamBoothSd15SmokeTest(unittest.TestCase):
             "validation": {
                 "validation_prompt": "photo of tok sample",
                 "num_validation_images": 2,
-                "validation_epochs": 1,
+                "validation_steps": 1,
             },
         }
         accelerator = DummyAccelerator()

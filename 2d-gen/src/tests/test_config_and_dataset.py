@@ -100,6 +100,43 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize_training_config(raw_config)
 
+    def test_normalize_training_config_rejects_validation_epochs(self) -> None:
+        raw_config = {
+            "model": {
+                "family": "stable_diffusion",
+                "pretrained_model_name_or_path": "/tmp/model",
+            },
+            "data": {
+                "train_manifest": "/tmp/train.jsonl",
+                "resolution": 256,
+            },
+            "train": {
+                "output_dir": "outputs/test",
+                "seed": 3407,
+                "train_batch_size": 1,
+                "num_train_epochs": 1,
+                "max_train_steps": 1,
+                "gradient_accumulation_steps": 1,
+                "learning_rate": 1.0e-4,
+                "mixed_precision": "fp16",
+                "optimizer": {},
+                "lora": {
+                    "rank": 4,
+                    "alpha": 8,
+                    "dropout": 0.0,
+                    "target_modules": ["to_q"],
+                },
+                "sdxl": {},
+            },
+            "validation": {
+                "validation_prompt": "a liver CT slice",
+                "validation_epochs": 1,
+            },
+        }
+
+        with self.assertRaisesRegex(ValueError, "validation\\.validation_epochs"):
+            normalize_training_config(raw_config)
+
     def test_manifest_dataset(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)

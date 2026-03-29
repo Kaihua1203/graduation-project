@@ -68,6 +68,7 @@ def normalize_dreambooth_config(config: dict[str, Any]) -> dict[str, Any]:
     train = _ensure_mapping(config, "train")
     validation = _optional_mapping(config, "validation")
     logging_cfg = _optional_mapping(config, "logging")
+    _reject_legacy_validation_schema(validation)
 
     normalized = {
         "model": {
@@ -129,7 +130,7 @@ def normalize_dreambooth_config(config: dict[str, Any]) -> dict[str, Any]:
         "validation": {
             "validation_prompt": validation.get("validation_prompt"),
             "num_validation_images": int(validation.get("num_validation_images", 4)),
-            "validation_epochs": int(validation.get("validation_epochs", 1)),
+            "validation_steps": int(validation.get("validation_steps", 1)),
         },
         "logging": {
             "report_to": str(logging_cfg.get("report_to", "none")),
@@ -252,6 +253,11 @@ def _normalize_project_name(logging_cfg: dict[str, Any]) -> str:
     return project_name
 
 
+def _reject_legacy_validation_schema(validation: dict[str, Any]) -> None:
+    if "validation_epochs" in validation:
+        raise ValueError("validation.validation_epochs is no longer supported. Use validation.validation_steps.")
+
+
 def _validate_dreambooth_config(config: dict[str, Any]) -> None:
     train_cfg = config["train"]
     data_cfg = config["data"]
@@ -273,8 +279,8 @@ def _validate_dreambooth_config(config: dict[str, Any]) -> None:
         raise ValueError("train.prior_generation_precision must be one of: no, fp32, fp16, bf16.")
     if validation_cfg["num_validation_images"] <= 0:
         raise ValueError("validation.num_validation_images must be positive.")
-    if validation_cfg["validation_epochs"] <= 0:
-        raise ValueError("validation.validation_epochs must be positive.")
+    if validation_cfg["validation_steps"] <= 0:
+        raise ValueError("validation.validation_steps must be positive.")
     if train_cfg["max_train_steps"] is not None and int(train_cfg["max_train_steps"]) <= 0:
         raise ValueError("train.max_train_steps must be positive when provided.")
     if train_cfg["optimizer"]["use_8bit_adam"]:
@@ -300,10 +306,10 @@ def flatten_config(prefix: str, value: Any, output: dict[str, Any]) -> None:
     output[prefix] = value
 
 
-def should_run_validation(config: dict[str, Any], epoch: int) -> bool:
+def should_run_validation(config: dict[str, Any], global_step: int) -> bool:
     validation_cfg = config["validation"]
     prompt = validation_cfg.get("validation_prompt")
-    return bool(prompt) and (epoch + 1) % validation_cfg["validation_epochs"] == 0
+    return bool(prompt) and global_step % validation_cfg["validation_steps"] == 0
 
 
 def resolve_prior_generation_dtype(precision: str, accelerator: Accelerator) -> torch.dtype:
@@ -972,25 +978,25 @@ def main() -> None:
                 if accelerator.is_main_process:
                     prune_checkpoints(output_dir, train_cfg["checkpoints_total_limit"])
 
+            if should_run_validation(config, global_step):
+                log_validation(
+                    accelerator=accelerator,
+                    config=config,
+                    unet=unet,
+                    vae=vae,
+                    tokenizer=tokenizer,
+                    text_encoder=text_encoder,
+                    weight_dtype=weight_dtype,
+                    epoch=epoch,
+                    global_step=global_step,
+                    phase_name="validation",
+                )
+
             if global_step >= max_train_steps:
                 break
 
         if global_step >= max_train_steps:
             break
-
-        if should_run_validation(config, epoch):
-            log_validation(
-                accelerator=accelerator,
-                config=config,
-                unet=unet,
-                vae=vae,
-                tokenizer=tokenizer,
-                text_encoder=text_encoder,
-                weight_dtype=weight_dtype,
-                epoch=epoch,
-                global_step=global_step,
-                phase_name="validation",
-            )
 
     accelerator.wait_for_everyone()
     final_output_dir = ensure_dir(output_dir / "final_lora")
