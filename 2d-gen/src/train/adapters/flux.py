@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +47,7 @@ class FluxAdapter(BaseModelAdapter):
         self.weight_dtype = torch.float32
         self.vae_scale_factor = 8
         self.guidance_scale = 3.5
+        self.requires_guidance = False
         self.weighting_scheme = "none"
         self._checkpoint_hooks_registered = False
 
@@ -72,6 +72,7 @@ class FluxAdapter(BaseModelAdapter):
         self.scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipeline.scheduler.config)
         self.weight_dtype = weight_dtype
         self.vae_scale_factor = pipeline.vae_scale_factor
+        self.requires_guidance = bool(getattr(self.transformer.config, "guidance_embeds", False))
         self.transformer.requires_grad_(False)
         self.vae.requires_grad_(False)
         if self.text_encoder is not None:
@@ -176,7 +177,7 @@ class FluxAdapter(BaseModelAdapter):
         sigmas = self._get_sigmas(timesteps, latents.ndim, latents.dtype)
 
         guidance = None
-        if getattr(getattr(self.transformer, "config", None), "guidance_embeds", False):
+        if self._transformer_requires_guidance():
             guidance = torch.full(
                 (latents.shape[0],),
                 self.guidance_scale,
@@ -376,3 +377,12 @@ class FluxAdapter(BaseModelAdapter):
         if accelerator is None:
             return self.transformer
         return accelerator.unwrap_model(self.transformer)
+
+    def _transformer_requires_guidance(self) -> bool:
+        if self.transformer is None:
+            return self.requires_guidance
+        module = getattr(self.transformer, "module", self.transformer)
+        config = getattr(module, "config", None)
+        if config is None:
+            return self.requires_guidance
+        return bool(getattr(config, "guidance_embeds", self.requires_guidance))

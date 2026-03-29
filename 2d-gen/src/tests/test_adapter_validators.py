@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 import torch
 
@@ -83,6 +84,12 @@ class AdapterValidatorSmokeTest(unittest.TestCase):
                 text_ids=torch.zeros(77, 3),
             )
         )
+
+    def test_flux_detects_guidance_from_wrapped_transformer(self) -> None:
+        adapter = FluxAdapter(make_config())
+        adapter.requires_guidance = True
+        adapter.transformer = SimpleNamespace(module=SimpleNamespace(config=SimpleNamespace(guidance_embeds=True)))
+        self.assertTrue(adapter._transformer_requires_guidance())
 
     def test_qwen_requires_prompt_mask(self) -> None:
         adapter = QwenImageAdapter(make_config())
