@@ -38,11 +38,11 @@
 - `validation.validation_epochs`
 - `logging.report_to`
 - `logging.logging_dir`
-- `logging.log_every_n_steps`
-- `logging.tracker_project_name`
+- `logging.project_name`
+- `logging.experiment_name`
 - `distributed.find_unused_parameters`
 
-`bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`, for example `bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2`. Distributed launcher settings should be passed via `accelerate launch`, not stored in the YAML config.
+`bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`. Single-GPU launches can omit launcher flags, while multi-GPU launches must pass `--multi_gpu`, `--num_processes`, and a matching `CUDA_VISIBLE_DEVICES` list, for example `CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train_sd_lora_example.yaml --multi_gpu --num_processes 2`. Distributed launcher settings should be passed via `accelerate launch`, not stored in the YAML config.
 
 `infer` config:
 

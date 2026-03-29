@@ -98,7 +98,7 @@ bash scripts/run_eval.sh configs/eval_example.yaml
 `scripts/run_train.sh` now wraps `accelerate launch`. Pass extra launcher arguments after the config path:
 
 ```bash
-bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2
+CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train_sd_lora_example.yaml --multi_gpu --num_processes 2
 ```
 
 The train config follows a diffusers-style schema with top-level `model`, `data`, `train`, `validation`, `logging`, and `distributed` sections. Legacy keys such as `model.pretrained_path`, `train.batch_size`, and `train.num_epochs` are rejected.
@@ -109,7 +109,7 @@ Validation is controlled by:
 - `validation.num_validation_images`
 - `validation.validation_epochs`
 
-When `logging.report_to: swanlab`, training logs include scalar metrics plus validation images and their prompt.
+When `logging.report_to: swanlab`, training logs include scalar metrics plus validation images. Use `logging.project_name` and `logging.experiment_name` to name the SwanLab project and run.
 
 Current runtime limits:
 
@@ -133,6 +133,8 @@ Override the venv when needed:
 ```bash
 VENV_DIR=/some/other/venv bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 ```
+
+Single-GPU execution still works without `--multi_gpu`; multi-GPU runs must set `CUDA_VISIBLE_DEVICES` and match `--num_processes` to the visible GPU count.
 
 ## Metric Assumptions
 

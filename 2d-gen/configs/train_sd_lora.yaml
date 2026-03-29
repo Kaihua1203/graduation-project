@@ -75,8 +75,8 @@ validation:
 logging:
   report_to: swanlab
   logging_dir: logs
-  log_every_n_steps: 5
-  tracker_project_name: 2d-gen-train
+  project_name: 2d-gen-train
+  experiment_name: train_sd_lora
 
 distributed:
   find_unused_parameters: false

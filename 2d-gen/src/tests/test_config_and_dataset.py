@@ -47,6 +47,14 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
                 },
                 "sdxl": {},
             },
+            "validation": {
+                "validation_prompt": "a liver CT slice",
+            },
+            "logging": {
+                "report_to": "swanlab",
+                "project_name": "2d-gen-train",
+                "experiment_name": "unit-test-run",
+            },
         }
 
         normalized = normalize_training_config(raw_config)
@@ -55,6 +63,8 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
         self.assertEqual(normalized["data"]["resolution"], 256)
         self.assertEqual(normalized["validation"]["num_validation_images"], 4)
         self.assertEqual(normalized["logging"]["report_to"], "swanlab")
+        self.assertEqual(normalized["logging"]["project_name"], "2d-gen-train")
+        self.assertEqual(normalized["logging"]["experiment_name"], "unit-test-run")
         self.assertFalse(normalized["distributed"]["find_unused_parameters"])
 
     def test_load_train_config_rejects_legacy_schema(self) -> None:
@@ -113,6 +123,42 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
                     "target_modules": ["to_q"],
                 },
                 "sdxl": {},
+            },
+        }
+
+        with self.assertRaises(ValueError):
+            normalize_training_config(raw_config)
+
+    def test_normalize_training_config_rejects_deprecated_logging_keys(self) -> None:
+        raw_config = {
+            "model": {
+                "family": "stable_diffusion",
+                "pretrained_model_name_or_path": "/tmp/model",
+            },
+            "data": {
+                "train_manifest": "/tmp/train.jsonl",
+                "resolution": 256,
+            },
+            "train": {
+                "output_dir": "outputs/test",
+                "seed": 3407,
+                "train_batch_size": 1,
+                "num_train_epochs": 1,
+                "max_train_steps": 1,
+                "gradient_accumulation_steps": 1,
+                "learning_rate": 1.0e-4,
+                "mixed_precision": "fp16",
+                "optimizer": {},
+                "lora": {
+                    "rank": 4,
+                    "alpha": 8,
+                    "dropout": 0.0,
+                    "target_modules": ["to_q"],
+                },
+                "sdxl": {},
+            },
+            "logging": {
+                "log_every_n_steps": 5,
             },
         }
 

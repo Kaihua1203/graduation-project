@@ -145,9 +145,14 @@ class BaseDiffusionTrainer:
             return
         tracker_config: dict[str, Any] = {}
         flatten_config("", self.config, tracker_config)
+        init_kwargs: dict[str, Any] = {}
+        experiment_name = self.logging_config.get("experiment_name")
+        if experiment_name is not None:
+            init_kwargs["swanlab"] = {"experiment_name": experiment_name}
         self.accelerator.init_trackers(
-            self.logging_config["tracker_project_name"],
+            self.logging_config["project_name"],
             config=tracker_config,
+            init_kwargs=init_kwargs,
         )
         self._trackers_initialized = True
 
@@ -260,7 +265,6 @@ class BaseDiffusionTrainer:
             )
         for tracker in self.accelerator.trackers:
             if tracker.name == "swanlab":
-                tracker.log({f"{phase_name}/prompt": prompt}, step=global_step)
                 tracker.log_images({f"{phase_name}/images": images}, step=global_step)
         self.accelerator.wait_for_everyone()
 
@@ -355,9 +359,6 @@ class BaseDiffusionTrainer:
                         step=global_step,
                     )
                 train_loss = 0.0
-
-                if global_step % self.logging_config["log_every_n_steps"] == 0:
-                    self.accelerator.print(f"step={global_step} loss={avg_loss.item():.6f}")
 
                 if global_step % self.train_config["checkpointing_steps"] == 0:
                     self.save_training_checkpoint(global_step, epoch)
