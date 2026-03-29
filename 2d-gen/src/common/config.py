@@ -28,9 +28,6 @@ def load_train_config(path: str | Path) -> Dict[str, Any]:
 
 
 def normalize_train_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    _reject_legacy_train_schema(config)
-    _reject_legacy_logging_schema(config)
-
     model = ensure_section(config, "model")
     data = ensure_section(config, "data")
     train = ensure_section(config, "train")
@@ -154,34 +151,6 @@ def _normalize_sdxl_config(value: Any) -> Dict[str, Any]:
         "enable_npu_flash_attention": bool(config.get("enable_npu_flash_attention", False)),
         "debug_loss": bool(config.get("debug_loss", False)),
     }
-
-
-def _reject_legacy_train_schema(config: Dict[str, Any]) -> None:
-    legacy_model_keys = {"pretrained_path"}
-    legacy_train_keys = {
-        "batch_size",
-        "num_epochs",
-        "image_size",
-        "num_workers",
-        "save_every_n_steps",
-        "lora_rank",
-        "lora_alpha",
-        "lora_dropout",
-        "target_modules",
-    }
-    model = config.get("model")
-    train = config.get("train")
-    if isinstance(model, dict) and legacy_model_keys.intersection(model.keys()):
-        raise ValueError("Legacy training config schema is no longer supported. Please migrate to the new schema.")
-    if isinstance(train, dict) and legacy_train_keys.intersection(train.keys()):
-        raise ValueError("Legacy training config schema is no longer supported. Please migrate to the new schema.")
-
-
-def _reject_legacy_logging_schema(config: Dict[str, Any]) -> None:
-    legacy_logging_keys = {"log_every_n_steps"}
-    logging = config.get("logging")
-    if isinstance(logging, dict) and legacy_logging_keys.intersection(logging.keys()):
-        raise ValueError("Legacy training config schema is no longer supported. Please migrate to the new schema.")
 
 
 def _require_string(section: Dict[str, Any], key: str) -> str:

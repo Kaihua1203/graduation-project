@@ -67,35 +67,6 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
         self.assertEqual(normalized["logging"]["experiment_name"], "unit-test-run")
         self.assertFalse(normalized["distributed"]["find_unused_parameters"])
 
-    def test_load_train_config_rejects_legacy_schema(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "legacy.yaml"
-            config_path.write_text(
-                "\n".join(
-                    [
-                        "model:",
-                        "  family: stable_diffusion",
-                        "  pretrained_path: /tmp/model",
-                        "data:",
-                        "  train_manifest: /tmp/train.jsonl",
-                        "train:",
-                        "  output_dir: outputs/test",
-                        "  batch_size: 1",
-                        "  num_epochs: 1",
-                        "  max_train_steps: 1",
-                        "  gradient_accumulation_steps: 1",
-                        "  learning_rate: 1.0e-4",
-                        "  mixed_precision: fp16",
-                        "  lora_rank: 4",
-                        "  lora_alpha: 8",
-                        "  target_modules: [to_q]",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            with self.assertRaises(ValueError):
-                load_train_config(config_path)
-
     def test_normalize_training_config_rejects_unimplemented_knobs(self) -> None:
         raw_config = {
             "model": {
@@ -123,42 +94,6 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
                     "target_modules": ["to_q"],
                 },
                 "sdxl": {},
-            },
-        }
-
-        with self.assertRaises(ValueError):
-            normalize_training_config(raw_config)
-
-    def test_normalize_training_config_rejects_deprecated_logging_keys(self) -> None:
-        raw_config = {
-            "model": {
-                "family": "stable_diffusion",
-                "pretrained_model_name_or_path": "/tmp/model",
-            },
-            "data": {
-                "train_manifest": "/tmp/train.jsonl",
-                "resolution": 256,
-            },
-            "train": {
-                "output_dir": "outputs/test",
-                "seed": 3407,
-                "train_batch_size": 1,
-                "num_train_epochs": 1,
-                "max_train_steps": 1,
-                "gradient_accumulation_steps": 1,
-                "learning_rate": 1.0e-4,
-                "mixed_precision": "fp16",
-                "optimizer": {},
-                "lora": {
-                    "rank": 4,
-                    "alpha": 8,
-                    "dropout": 0.0,
-                    "target_modules": ["to_q"],
-                },
-                "sdxl": {},
-            },
-            "logging": {
-                "log_every_n_steps": 5,
             },
         }
 

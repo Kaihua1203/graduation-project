@@ -5,11 +5,14 @@ import textwrap
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
+import numpy as np
 import torch
 
 from train.run_dreambooth_sd15 import (
     load_dreambooth_config,
+    log_validation,
     parse_args,
     resolve_prior_generation_dtype,
     should_run_validation,
@@ -75,6 +78,89 @@ class DreamBoothSd15SmokeTest(unittest.TestCase):
     def test_prior_generation_fp16_falls_back_to_fp32_on_cpu(self) -> None:
         accelerator = SimpleNamespace(device=torch.device("cpu"))
         self.assertEqual(resolve_prior_generation_dtype("fp16", accelerator), torch.float32)
+
+    def test_log_validation_does_not_log_prompt_to_swanlab(self) -> None:
+        class DummyTracker:
+            name = "swanlab"
+
+            def __init__(self) -> None:
+                self.logged_values: list[tuple[dict[str, object], int | None]] = []
+                self.logged_images: list[tuple[dict[str, object], int | None]] = []
+
+            def log(self, values: dict[str, object], step: int | None = None) -> None:
+                self.logged_values.append((values, step))
+
+            def log_images(self, values: dict[str, object], step: int | None = None) -> None:
+                self.logged_images.append((values, step))
+
+        class DummyPipeline:
+            def __init__(self) -> None:
+                self.scheduler = SimpleNamespace(config=SimpleNamespace(variance_type="fixed_small"))
+
+            def to(self, device):
+                del device
+                return self
+
+            def set_progress_bar_config(self, disable: bool) -> None:
+                del disable
+
+            def __call__(self, prompt: str, generator, num_inference_steps: int):
+                del prompt, generator, num_inference_steps
+                return SimpleNamespace(images=[np.zeros((4, 4, 3), dtype=np.uint8)])
+
+        class DummyAccelerator:
+            def __init__(self) -> None:
+                self.is_main_process = True
+                self.device = torch.device("cpu")
+                self.trackers = [DummyTracker()]
+                self.log_calls: list[tuple[dict[str, object], int | None]] = []
+
+            def wait_for_everyone(self) -> None:
+                return None
+
+            def log(self, values: dict[str, object], step: int | None = None) -> None:
+                self.log_calls.append((values, step))
+
+            def unwrap_model(self, model):
+                return model
+
+        config = {
+            "model": {
+                "pretrained_model_name_or_path": "/tmp/model",
+                "local_files_only": True,
+            },
+            "train": {
+                "seed": 3407,
+            },
+            "validation": {
+                "validation_prompt": "photo of tok sample",
+                "num_validation_images": 2,
+                "validation_epochs": 1,
+            },
+        }
+        accelerator = DummyAccelerator()
+
+        with patch("train.run_dreambooth_sd15.StableDiffusionPipeline.from_pretrained", return_value=DummyPipeline()), patch(
+            "train.run_dreambooth_sd15.DPMSolverMultistepScheduler.from_config",
+            side_effect=lambda config, **kwargs: SimpleNamespace(config=config, kwargs=kwargs),
+        ):
+            log_validation(
+                accelerator=accelerator,
+                config=config,
+                unet=torch.nn.Linear(1, 1),
+                vae=object(),
+                tokenizer=object(),
+                text_encoder=object(),
+                weight_dtype=torch.float32,
+                epoch=0,
+                global_step=3,
+                phase_name="test",
+            )
+
+        self.assertEqual(accelerator.log_calls, [({"test/epoch": 1, "test/global_step": 3}, 3)])
+        tracker = accelerator.trackers[0]
+        self.assertEqual(tracker.logged_values, [])
+        self.assertEqual(len(tracker.logged_images), 1)
 
 
 if __name__ == "__main__":

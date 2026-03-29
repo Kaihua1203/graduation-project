@@ -65,7 +65,7 @@ validation:
   validation_epochs: 1
 
 logging:
-  report_to: none
+  report_to: swanlab
   logging_dir: logs
-  log_every_n_steps: 10
-  tracker_project_name: 2d-gen-dreambooth-sd15
+  project_name: 2d-gen-train
+  experiment_name: sd15_dreambooth_example

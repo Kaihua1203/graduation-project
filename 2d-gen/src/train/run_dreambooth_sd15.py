@@ -134,8 +134,8 @@ def normalize_dreambooth_config(config: dict[str, Any]) -> dict[str, Any]:
         "logging": {
             "report_to": str(logging_cfg.get("report_to", "none")),
             "logging_dir": str(logging_cfg.get("logging_dir", "logs")),
-            "log_every_n_steps": int(logging_cfg.get("log_every_n_steps", 10)),
-            "tracker_project_name": str(logging_cfg.get("tracker_project_name", "2d-gen-dreambooth-sd15")),
+            "project_name": _normalize_project_name(logging_cfg),
+            "experiment_name": _optional_string(logging_cfg.get("experiment_name"), "experiment_name"),
         },
     }
 
@@ -159,6 +159,14 @@ def _optional_mapping(config: dict[str, Any], key: str) -> dict[str, Any]:
 
 def _require_string(section: dict[str, Any], key: str) -> str:
     value = section.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Expected non-empty string for '{key}'.")
+    return value
+
+
+def _optional_string(value: Any, key: str) -> str | None:
+    if value is None:
+        return None
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Expected non-empty string for '{key}'.")
     return value
@@ -235,6 +243,13 @@ def _normalize_precision_value(value: Any) -> str:
     if isinstance(value, str):
         return value
     raise ValueError("Precision values must be encoded as 'no', 'fp16', 'bf16', or 'fp32'.")
+
+
+def _normalize_project_name(logging_cfg: dict[str, Any]) -> str:
+    project_name = logging_cfg.get("project_name", "2d-gen-train")
+    if not isinstance(project_name, str) or not project_name.strip():
+        raise ValueError("Expected non-empty string for 'project_name'.")
+    return project_name
 
 
 def _validate_dreambooth_config(config: dict[str, Any]) -> None:
@@ -646,7 +661,6 @@ def log_validation(
                 dataformats="NHWC",
             )
         elif tracker.name == "swanlab":
-            tracker.log({f"{phase_name}/prompt": prompt}, step=global_step)
             tracker.log_images({f"{phase_name}/images": images}, step=global_step)
 
     del pipeline
@@ -828,7 +842,10 @@ def main() -> None:
     if accelerator.is_main_process and config["logging"]["report_to"] != "none":
         tracker_config: dict[str, Any] = {}
         flatten_config("", config, tracker_config)
-        accelerator.init_trackers(config["logging"]["tracker_project_name"], config=tracker_config)
+        init_kwargs: dict[str, Any] = {}
+        if config["logging"]["experiment_name"] is not None:
+            init_kwargs["swanlab"] = {"experiment_name": config["logging"]["experiment_name"]}
+        accelerator.init_trackers(config["logging"]["project_name"], config=tracker_config, init_kwargs=init_kwargs)
 
     global_step = 0
     first_epoch = 0
@@ -946,7 +963,7 @@ def main() -> None:
                     step=global_step,
                 )
 
-            if global_step % config["logging"]["log_every_n_steps"] == 0:
+            if global_step % 10 == 0:
                 accelerator.print(f"step={global_step} loss={loss.detach().item():.6f}")
 
             if global_step % train_cfg["checkpointing_steps"] == 0:

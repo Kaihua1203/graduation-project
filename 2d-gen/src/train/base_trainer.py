@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import logging
 import shutil
 from contextlib import nullcontext
 from pathlib import Path
@@ -26,6 +27,7 @@ ADAPTERS = {
     "flux": "train.adapters.flux:FluxAdapter",
     "qwenimage": "train.adapters.qwenimage:QwenImageAdapter",
 }
+LOGGER = logging.getLogger(__name__)
 
 
 def resolve_adapter_class(family: str) -> type[BaseModelAdapter]:
@@ -271,6 +273,7 @@ class BaseDiffusionTrainer:
     def train(self) -> Path:
         self.adapter.setup(self.accelerator, self.weight_dtype)
         train_dataloader = self.build_dataloader()
+        train_dataset_size = len(train_dataloader.dataset) if hasattr(train_dataloader, "dataset") else None
         optimizer = self.build_optimizer()
         lr_scheduler = self.build_lr_scheduler(optimizer)
 
@@ -283,7 +286,33 @@ class BaseDiffusionTrainer:
         self.adapter.set_prepared_models(tuple(prepared_models))
         self.adapter.register_checkpointing_hooks(self.accelerator)
 
+        num_update_steps_per_epoch = math.ceil(
+            len(train_dataloader) / self.train_config["gradient_accumulation_steps"]
+        )
+        max_train_steps = int(self.train_config["max_train_steps"])
+        num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
+        total_batch_size = (
+            self.train_config["train_batch_size"]
+            * self.accelerator.num_processes
+            * self.train_config["gradient_accumulation_steps"]
+        )
+
         self.initialize_trackers()
+
+        if self.accelerator.is_main_process:
+            overview_lines = [
+                "***** Running training *****",
+                f"  Num examples = {train_dataset_size if train_dataset_size is not None else 'unknown'}",
+                f"  Num batches each epoch = {len(train_dataloader)}",
+                f"  Num Epochs = {num_train_epochs}",
+                f"  Instantaneous batch size per device = {self.train_config['train_batch_size']}",
+                f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}",
+                f"  Gradient Accumulation steps = {self.train_config['gradient_accumulation_steps']}",
+                f"  Total optimization steps = {max_train_steps}",
+            ]
+            for line in overview_lines:
+                LOGGER.info(line)
+                self.accelerator.print(line)
 
         global_step = 0
         first_epoch = 0
@@ -293,10 +322,10 @@ class BaseDiffusionTrainer:
             self.accelerator.load_state(str(checkpoint_path))
             self.adapter.on_checkpoint_loaded(self.accelerator)
             global_step = int(checkpoint_metadata.get("global_step", 0))
-            first_epoch = int(checkpoint_metadata.get("epoch", 0))
+            first_epoch = global_step // num_update_steps_per_epoch
 
         progress_bar = tqdm(
-            total=self.train_config["max_train_steps"],
+            total=max_train_steps,
             initial=global_step,
             disable=not self.accelerator.is_local_main_process,
             desc="train",
@@ -304,7 +333,7 @@ class BaseDiffusionTrainer:
         loss_history: list[float] = []
         train_loss = 0.0
 
-        for epoch in range(first_epoch, self.train_config["num_train_epochs"]):
+        for epoch in range(first_epoch, num_train_epochs):
             for batch in train_dataloader:
                 with self.accelerator.accumulate(self.adapter.get_accumulate_target()):
                     conditioning = self.adapter.encode_text(batch, self.accelerator.device, self.weight_dtype)
@@ -363,10 +392,10 @@ class BaseDiffusionTrainer:
                 if global_step % self.train_config["checkpointing_steps"] == 0:
                     self.save_training_checkpoint(global_step, epoch)
 
-                if global_step >= self.train_config["max_train_steps"]:
+                if global_step >= max_train_steps:
                     break
 
-            if global_step >= self.train_config["max_train_steps"]:
+            if global_step >= max_train_steps:
                 break
 
             if (
