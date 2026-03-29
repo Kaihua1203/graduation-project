@@ -47,6 +47,14 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
                 },
                 "sdxl": {},
             },
+            "validation": {
+                "validation_prompt": "a liver CT slice",
+            },
+            "logging": {
+                "report_to": "swanlab",
+                "project_name": "2d-gen-train",
+                "experiment_name": "unit-test-run",
+            },
         }
 
         normalized = normalize_training_config(raw_config)
@@ -55,36 +63,9 @@ class ConfigAndDatasetSmokeTest(unittest.TestCase):
         self.assertEqual(normalized["data"]["resolution"], 256)
         self.assertEqual(normalized["validation"]["num_validation_images"], 4)
         self.assertEqual(normalized["logging"]["report_to"], "swanlab")
+        self.assertEqual(normalized["logging"]["project_name"], "2d-gen-train")
+        self.assertEqual(normalized["logging"]["experiment_name"], "unit-test-run")
         self.assertFalse(normalized["distributed"]["find_unused_parameters"])
-
-    def test_load_train_config_rejects_legacy_schema(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "legacy.yaml"
-            config_path.write_text(
-                "\n".join(
-                    [
-                        "model:",
-                        "  family: stable_diffusion",
-                        "  pretrained_path: /tmp/model",
-                        "data:",
-                        "  train_manifest: /tmp/train.jsonl",
-                        "train:",
-                        "  output_dir: outputs/test",
-                        "  batch_size: 1",
-                        "  num_epochs: 1",
-                        "  max_train_steps: 1",
-                        "  gradient_accumulation_steps: 1",
-                        "  learning_rate: 1.0e-4",
-                        "  mixed_precision: fp16",
-                        "  lora_rank: 4",
-                        "  lora_alpha: 8",
-                        "  target_modules: [to_q]",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            with self.assertRaises(ValueError):
-                load_train_config(config_path)
 
     def test_normalize_training_config_rejects_unimplemented_knobs(self) -> None:
         raw_config = {

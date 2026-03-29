@@ -51,6 +51,16 @@ class AdapterValidatorSmokeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             adapter.validate_conditioning(Conditioning(prompt_embeds=torch.zeros(2, 77, 2048)))
 
+    def test_sdxl_accepts_full_conditioning(self) -> None:
+        adapter = SDXLAdapter(make_config())
+        adapter.validate_conditioning(
+            Conditioning(
+                prompt_embeds=torch.zeros(2, 77, 2048),
+                pooled_prompt_embeds=torch.zeros(2, 1280),
+                add_time_ids=torch.zeros(2, 6),
+            )
+        )
+
     def test_flux_requires_packed_latents(self) -> None:
         adapter = FluxAdapter(make_config())
         adapter.validate_conditioning(
@@ -64,10 +74,30 @@ class AdapterValidatorSmokeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             adapter.validate_latents(torch.zeros(2, 4, 64, 64))
 
+    def test_flux_accepts_sequence_level_text_ids(self) -> None:
+        adapter = FluxAdapter(make_config())
+        adapter.validate_conditioning(
+            Conditioning(
+                prompt_embeds=torch.zeros(2, 77, 4096),
+                pooled_prompt_embeds=torch.zeros(2, 768),
+                text_ids=torch.zeros(77, 3),
+            )
+        )
+
     def test_qwen_requires_prompt_mask(self) -> None:
         adapter = QwenImageAdapter(make_config())
         with self.assertRaises(ValueError):
             adapter.validate_conditioning(Conditioning(prompt_embeds=torch.zeros(2, 256, 3584)))
+
+    def test_qwen_accepts_prompt_mask_and_packed_latents(self) -> None:
+        adapter = QwenImageAdapter(make_config())
+        adapter.validate_conditioning(
+            Conditioning(
+                prompt_embeds=torch.zeros(2, 256, 3584),
+                prompt_mask=torch.ones(2, 256, dtype=torch.long),
+            )
+        )
+        adapter.validate_latents(torch.zeros(2, 4096, 64))
 
 
 if __name__ == "__main__":

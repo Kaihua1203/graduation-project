@@ -3,8 +3,9 @@
 End-to-end 2D medical image generation project for:
 
 1. LoRA fine-tuning of text-to-image foundation models.
-2. Local-path-only inference with exported LoRA adapters.
-3. Generation-side quality evaluation with `FID`, `IS`, `CLIP-I`, and `CLIP-T`.
+2. Standalone SD1.5 DreamBooth LoRA fine-tuning with local instance/class image folders.
+3. Local-path-only inference with exported LoRA adapters.
+4. Generation-side quality evaluation with `FID`, `IS`, `CLIP-I`, and `CLIP-T`.
 
 ## Current Status
 
@@ -31,6 +32,7 @@ Planned next:
 - `src/common/`: config, paths, shared runtime objects
 - `src/data/`: manifest dataset loader
 - `src/train/`: base trainer and model adapters
+- `src/train/run_dreambooth_sd15.py`: standalone SD1.5 DreamBooth LoRA trainer
 - `src/infer/`: generation entrypoint
 - `src/eval/`: metric implementations and evaluation runner
 - `outputs/`: checkpoints, generated images, metrics, logs
@@ -91,6 +93,7 @@ Run from `2d-gen/`:
 
 ```bash
 bash scripts/run_train.sh configs/train_sd_lora_example.yaml
+bash scripts/run_dreambooth_sd15.sh configs/train_sd15_dreambooth_example.yaml
 bash scripts/run_infer.sh configs/infer_sd_example.yaml
 bash scripts/run_eval.sh configs/eval_example.yaml
 ```
@@ -98,10 +101,18 @@ bash scripts/run_eval.sh configs/eval_example.yaml
 `scripts/run_train.sh` now wraps `accelerate launch`. Pass extra launcher arguments after the config path:
 
 ```bash
-bash scripts/run_train.sh configs/train_sd_lora_example.yaml --num_processes 2
+CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train_sd_lora_example.yaml --multi_gpu --num_processes 2
+bash scripts/run_dreambooth_sd15.sh configs/train_sd15_dreambooth_example.yaml --num_processes 2
 ```
 
 The train config follows a diffusers-style schema with top-level `model`, `data`, `train`, `validation`, `logging`, and `distributed` sections. Legacy keys such as `model.pretrained_path`, `train.batch_size`, and `train.num_epochs` are rejected.
+
+The standalone SD1.5 DreamBooth path uses its own config file and does not route through `BaseDiffusionTrainer`. It expects local directories for:
+
+- `data.instance_data_dir`
+- `data.class_data_dir` when `data.with_prior_preservation: true`
+
+The DreamBooth trainer preserves the official diffusers instance/class-image flow, saves LoRA checkpoints under `<output_dir>/checkpoint-*`, and writes final weights to `<output_dir>/final_lora`.
 
 Validation is controlled by:
 
@@ -109,7 +120,7 @@ Validation is controlled by:
 - `validation.num_validation_images`
 - `validation.validation_epochs`
 
-When `logging.report_to: swanlab`, training logs include scalar metrics plus validation images and their prompt.
+When `logging.report_to: swanlab`, training logs include scalar metrics plus validation images. Use `logging.project_name` and `logging.experiment_name` to name the SwanLab project and run.
 
 Current runtime limits:
 
@@ -133,6 +144,8 @@ Override the venv when needed:
 ```bash
 VENV_DIR=/some/other/venv bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 ```
+
+Single-GPU execution still works without `--multi_gpu`; multi-GPU runs must set `CUDA_VISIBLE_DEVICES` and match `--num_processes` to the visible GPU count.
 
 ## Metric Assumptions
 

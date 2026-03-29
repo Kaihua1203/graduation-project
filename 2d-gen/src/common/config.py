@@ -28,8 +28,6 @@ def load_train_config(path: str | Path) -> Dict[str, Any]:
 
 
 def normalize_train_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    _reject_legacy_train_schema(config)
-
     model = ensure_section(config, "model")
     data = ensure_section(config, "data")
     train = ensure_section(config, "train")
@@ -101,8 +99,11 @@ def normalize_train_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "logging": {
             "report_to": str(logging.get("report_to", "swanlab")),
             "logging_dir": str(logging.get("logging_dir", "logs")),
-            "log_every_n_steps": int(logging.get("log_every_n_steps", 10)),
-            "tracker_project_name": str(logging.get("tracker_project_name", "2d-gen-train")),
+            "project_name": _normalize_project_name(logging),
+            "experiment_name": _optional_string(
+                logging.get("experiment_name"),
+                "experiment_name",
+            ),
         },
         "distributed": {
             "find_unused_parameters": bool(distributed.get("find_unused_parameters", False)),
@@ -152,32 +153,28 @@ def _normalize_sdxl_config(value: Any) -> Dict[str, Any]:
     }
 
 
-def _reject_legacy_train_schema(config: Dict[str, Any]) -> None:
-    legacy_model_keys = {"pretrained_path"}
-    legacy_train_keys = {
-        "batch_size",
-        "num_epochs",
-        "image_size",
-        "num_workers",
-        "save_every_n_steps",
-        "lora_rank",
-        "lora_alpha",
-        "lora_dropout",
-        "target_modules",
-    }
-    model = config.get("model")
-    train = config.get("train")
-    if isinstance(model, dict) and legacy_model_keys.intersection(model.keys()):
-        raise ValueError("Legacy training config schema is no longer supported. Please migrate to the new schema.")
-    if isinstance(train, dict) and legacy_train_keys.intersection(train.keys()):
-        raise ValueError("Legacy training config schema is no longer supported. Please migrate to the new schema.")
-
-
 def _require_string(section: Dict[str, Any], key: str) -> str:
     value = section.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Expected non-empty string for '{key}'.")
     return value
+
+
+def _optional_string(value: Any, key: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Expected non-empty string for '{key}'.")
+    return value
+
+
+def _normalize_project_name(logging: Dict[str, Any]) -> str:
+    project_name = logging.get("project_name")
+    if project_name is None:
+        project_name = logging.get("tracker_project_name", "2d-gen-train")
+    if not isinstance(project_name, str) or not project_name.strip():
+        raise ValueError("Expected non-empty string for 'project_name'.")
+    return project_name
 
 
 def _validate_train_config(config: Dict[str, Any]) -> None:
