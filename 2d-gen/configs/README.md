@@ -49,13 +49,15 @@
 - `model.family`
 - `model.pretrained_path`
 - `model.lora_path`
-- `infer.prompts_path`
+- `infer.prompts_path`: single `.txt` file or directory of `.txt` files
 - `infer.output_dir`
 - `infer.num_inference_steps`
 - `infer.guidance_scale`
 - `infer.height`
 - `infer.width`
 - `infer.seed`
+
+Single-file inference keeps the existing line-by-line behavior. Directory-based inference processes `.txt` files in lexicographic order and treats each file as one prompt.
 
 `eval` config:
 
