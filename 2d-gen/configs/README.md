@@ -100,8 +100,8 @@
 - `validation.validation_epochs`
 - `logging.report_to`
 - `logging.logging_dir`
-- `logging.log_every_n_steps`
-- `logging.tracker_project_name`
+- `logging.project_name`
+- `logging.experiment_name`
 
 `infer` config:
 

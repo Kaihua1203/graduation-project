@@ -286,8 +286,11 @@ class BaseDiffusionTrainer:
         self.adapter.set_prepared_models(tuple(prepared_models))
         self.adapter.register_checkpointing_hooks(self.accelerator)
 
+        num_batches_per_epoch = len(train_dataloader)
+        if num_batches_per_epoch <= 0:
+            raise ValueError("Training dataloader is empty. Check train_manifest and max_train_samples.")
         num_update_steps_per_epoch = math.ceil(
-            len(train_dataloader) / self.train_config["gradient_accumulation_steps"]
+            num_batches_per_epoch / self.train_config["gradient_accumulation_steps"]
         )
         max_train_steps = int(self.train_config["max_train_steps"])
         num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
@@ -303,7 +306,7 @@ class BaseDiffusionTrainer:
             overview_lines = [
                 "***** Running training *****",
                 f"  Num examples = {train_dataset_size if train_dataset_size is not None else 'unknown'}",
-                f"  Num batches each epoch = {len(train_dataloader)}",
+                f"  Num batches each epoch = {num_batches_per_epoch}",
                 f"  Num Epochs = {num_train_epochs}",
                 f"  Instantaneous batch size per device = {self.train_config['train_batch_size']}",
                 f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}",

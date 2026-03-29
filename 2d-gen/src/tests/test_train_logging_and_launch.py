@@ -299,6 +299,30 @@ class TrainerLoggingSmokeTest(unittest.TestCase):
             )
             self.assertIn("  Total optimization steps = 5", trainer.accelerator.print_calls)
 
+    def test_train_raises_clear_error_for_empty_dataloader(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "outputs"
+            config = make_minimal_config(output_dir)
+            config["train"]["optimizer"] = {
+                "adam_beta1": 0.9,
+                "adam_beta2": 0.999,
+                "adam_weight_decay": 1.0e-2,
+                "adam_epsilon": 1.0e-8,
+            }
+            config["train"]["lr_scheduler"] = "constant"
+            config["train"]["lr_warmup_steps"] = 0
+            config["train"]["checkpointing_steps"] = 10
+            config["train"]["max_grad_norm"] = 1.0
+            config["logging"]["report_to"] = "none"
+            config["validation"]["validation_prompt"] = None
+
+            with patch.object(base_trainer, "Accelerator", FakeAccelerator), patch.object(
+                base_trainer, "resolve_adapter_class", return_value=DummyTrainAdapter
+            ), patch.object(BaseDiffusionTrainer, "build_dataloader", return_value=[]):
+                trainer = BaseDiffusionTrainer(config)
+                with self.assertRaisesRegex(ValueError, "Training dataloader is empty"):
+                    trainer.train()
+
 
 class RunTrainScriptSmokeTest(unittest.TestCase):
     def _make_env(self, tmpdir: Path) -> dict[str, str]:
