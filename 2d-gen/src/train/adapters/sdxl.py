@@ -22,6 +22,7 @@ from peft.utils import get_peft_model_state_dict, set_peft_model_state_dict  # n
 class SDXLAdapter(BaseModelAdapter):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config)
+        self.pipeline = None
         self.unet = None
         self.vae = None
         self.text_encoder = None
@@ -35,6 +36,7 @@ class SDXLAdapter(BaseModelAdapter):
     def setup(self, accelerator: Any, weight_dtype: torch.dtype) -> None:
         model_cfg = self.config["model"]
         train_cfg = self.config["train"]
+        pretrained_vae_model_name_or_path = model_cfg.get("pretrained_vae_model_name_or_path")
         if train_cfg.get("sdxl", {}).get("train_text_encoder", False):
             raise NotImplementedError("train.sdxl.train_text_encoder is not supported by the shared trainer yet.")
 
@@ -46,6 +48,7 @@ class SDXLAdapter(BaseModelAdapter):
             torch_dtype=weight_dtype,
         )
 
+        self.pipeline = pipeline
         self.unet = pipeline.unet
         self.vae = pipeline.vae
         self.text_encoder = pipeline.text_encoder
@@ -61,7 +64,6 @@ class SDXLAdapter(BaseModelAdapter):
         self.text_encoder.requires_grad_(False)
         self.text_encoder_2.requires_grad_(False)
 
-        pretrained_vae_model_name_or_path = model_cfg.get("pretrained_vae_model_name_or_path")
         if pretrained_vae_model_name_or_path:
             self.vae = AutoencoderKL.from_pretrained(
                 pretrained_vae_model_name_or_path,
@@ -87,7 +89,9 @@ class SDXLAdapter(BaseModelAdapter):
             self.unet.enable_xformers_memory_efficient_attention()
 
         self.unet.to(accelerator.device, dtype=weight_dtype)
-        self.vae.to(accelerator.device, dtype=weight_dtype)
+        # Keep the base SDXL VAE in fp32 to match the upstream LoRA trainer and avoid NaN latents/losses.
+        vae_dtype = weight_dtype if pretrained_vae_model_name_or_path else torch.float32
+        self.vae.to(accelerator.device, dtype=vae_dtype)
         self.text_encoder.to(accelerator.device, dtype=weight_dtype)
         self.text_encoder_2.to(accelerator.device, dtype=weight_dtype)
         if accelerator.mixed_precision == "fp16":
@@ -126,12 +130,15 @@ class SDXLAdapter(BaseModelAdapter):
         self, batch: dict[str, Any], device: torch.device, dtype: torch.dtype
     ) -> Conditioning:
         assert self.text_encoder_2 is not None
+        assert self.pipeline is not None
         prompts = batch["prompt"]
         prompt_2 = batch.get("prompt_2") or prompts
-        prompt_embeds, _, pooled_prompt_embeds, _ = self._build_prompt_embeds(
-            prompts=prompts,
+        prompt_embeds, _, pooled_prompt_embeds, _ = self.pipeline.encode_prompt(
+            prompt=prompts,
             prompt_2=prompt_2,
             device=device,
+            num_images_per_prompt=1,
+            do_classifier_free_guidance=False,
         )
         add_time_ids = self._build_add_time_ids(batch, device, dtype, prompt_embeds.shape[0])
         conditioning = Conditioning(
@@ -379,46 +386,6 @@ class SDXLAdapter(BaseModelAdapter):
         if conditioning.add_time_ids.ndim != 2:
             raise ValueError(f"SDXL add_time_ids must be rank-2, got shape={tuple(conditioning.add_time_ids.shape)}")
 
-    def _build_prompt_embeds(
-        self,
-        prompts: list[str],
-        prompt_2: list[str],
-        device: torch.device,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        assert self.text_encoder is not None
-        assert self.text_encoder_2 is not None
-        assert self.tokenizer is not None
-        assert self.tokenizer_2 is not None
-
-        tokenizers = (self.tokenizer, self.tokenizer_2)
-        text_encoders = (self.text_encoder, self.text_encoder_2)
-        prompt_embeds_list: list[torch.Tensor] = []
-        pooled_prompt_embeds = None
-
-        for encoder_index, (current_prompts, tokenizer, text_encoder) in enumerate(
-            zip((prompts, prompt_2), tokenizers, text_encoders)
-        ):
-            text_inputs = tokenizer(
-                current_prompts,
-                padding="max_length",
-                max_length=tokenizer.model_max_length,
-                truncation=True,
-                return_tensors="pt",
-            )
-            text_input_ids = text_inputs.input_ids.to(device)
-            prompt_embeds = text_encoder(
-                text_input_ids,
-                output_hidden_states=True,
-                return_dict=False,
-            )
-            if encoder_index == 0:
-                pooled_prompt_embeds = prompt_embeds[0]
-            prompt_embeds_list.append(prompt_embeds[-1][-2])
-
-        prompt_embeds = torch.cat(prompt_embeds_list, dim=-1)
-        assert pooled_prompt_embeds is not None
-        return prompt_embeds, prompt_embeds, pooled_prompt_embeds, pooled_prompt_embeds
-
     def _build_add_time_ids(
         self,
         batch: dict[str, Any],
@@ -426,7 +393,9 @@ class SDXLAdapter(BaseModelAdapter):
         dtype: torch.dtype,
         batch_size: int,
     ) -> torch.Tensor:
+        assert self.unet is not None
         projection_dim = getattr(getattr(self.text_encoder_2, "config", None), "projection_dim", None)
+        unet_for_config = self.unet.module if hasattr(self.unet, "module") else self.unet
         time_ids = []
         for index in range(batch_size):
             original_size = self._resolve_size_value(batch, "original_size", index)
@@ -438,15 +407,16 @@ class SDXLAdapter(BaseModelAdapter):
                 original_size = (height, width)
             if target_size is None:
                 target_size = original_size
-            add_time_ids = StableDiffusionXLPipeline._get_add_time_ids(
-                self,
-                original_size=original_size,
-                crops_coords_top_left=crops_coords_top_left,
-                target_size=target_size,
-                dtype=dtype,
-                text_encoder_projection_dim=projection_dim,
-            )
-            time_ids.append(add_time_ids.to(device=device, dtype=dtype))
+            add_time_values = list(original_size + crops_coords_top_left + target_size)
+            passed_add_embed_dim = unet_for_config.config.addition_time_embed_dim * len(add_time_values) + projection_dim
+            expected_add_embed_dim = unet_for_config.add_embedding.linear_1.in_features
+            if expected_add_embed_dim != passed_add_embed_dim:
+                raise ValueError(
+                    "Model expects an added time embedding vector of length "
+                    f"{expected_add_embed_dim}, but a vector of {passed_add_embed_dim} was created."
+                )
+            add_time_ids = torch.tensor([add_time_values], dtype=dtype, device=device)
+            time_ids.append(add_time_ids)
         return torch.cat(time_ids, dim=0)
 
     def _resolve_size_value(
