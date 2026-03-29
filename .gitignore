@@ -19,3 +19,5 @@ lightning_logs/
 *.ckpt
 *.pt
 *.pth
+.codex
+2d-gen/tasks/
