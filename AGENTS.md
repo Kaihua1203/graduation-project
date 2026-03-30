@@ -1,11 +1,11 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-See `ARCHITECTURE.md` for the current repository layout and module map.
+Read `ARCHITECTURE.md` for the current repository layout and module map.
 
 ## Project Environment Rules
 - Before starting implementation work, first align with the user on which project environment or `venv` should be used. Do not assume the environment if the user has not specified it.
-- After planning and before writing code, verify the selected environment for dependency, version, and runtime compatibility. Resolve version conflicts or incompatibilities first, then start development.
+- For example: When working in the `2d-gen` repository, use the virtual environment located at `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers`.
 
 ## Coding Style & Naming Conventions
 - Python code uses 4-space indentation and standard PEP 8 naming.
@@ -45,10 +45,6 @@ Scope in this repo:
 Read in order:
 1. `docs/diffusers/training_mapping.md`
 2. `docs/diffusers/training_architecture.md`
-3. `docs/diffusers/stable_diffusion.md`
-4. `docs/diffusers/sdxl.md`
-5. `docs/diffusers/flux.md`
-6. `docs/diffusers/qwenimage.md`
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the read tool (use offset + limit for ranged reads).
