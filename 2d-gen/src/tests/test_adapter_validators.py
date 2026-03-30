@@ -9,6 +9,7 @@ from common.types import Conditioning
 from train.adapters.flux import FluxAdapter
 from train.adapters.qwenimage import QwenImageAdapter
 from train.adapters.sdxl import SDXLAdapter
+from train.adapters.stable_diffusion_3 import StableDiffusion3Adapter
 
 try:
     from train.adapters.stable_diffusion import StableDiffusionAdapter
@@ -105,6 +106,20 @@ class AdapterValidatorSmokeTest(unittest.TestCase):
             )
         )
         adapter.validate_latents(torch.zeros(2, 4096, 64))
+
+    def test_sd3_requires_pooled_prompt_embeds(self) -> None:
+        adapter = StableDiffusion3Adapter(make_config())
+        with self.assertRaises(ValueError):
+            adapter.validate_conditioning(Conditioning(prompt_embeds=torch.zeros(2, 256, 4096)))
+
+    def test_sd3_accepts_token_and_pooled_conditioning(self) -> None:
+        adapter = StableDiffusion3Adapter(make_config())
+        adapter.validate_conditioning(
+            Conditioning(
+                prompt_embeds=torch.zeros(2, 256, 4096),
+                pooled_prompt_embeds=torch.zeros(2, 2048),
+            )
+        )
 
 
 if __name__ == "__main__":

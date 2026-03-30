@@ -23,6 +23,7 @@ from train.adapters.base import BaseModelAdapter
 
 ADAPTERS = {
     "stable_diffusion": "train.adapters.stable_diffusion:StableDiffusionAdapter",
+    "stable_diffusion_3": "train.adapters.stable_diffusion_3:StableDiffusion3Adapter",
     "sdxl": "train.adapters.sdxl:SDXLAdapter",
     "flux": "train.adapters.flux:FluxAdapter",
     "qwenimage": "train.adapters.qwenimage:QwenImageAdapter",

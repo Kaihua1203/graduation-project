@@ -15,6 +15,7 @@ from diffusers import QwenImagePipeline
 from train.adapters.flux import FluxAdapter
 from train.adapters.qwenimage import QwenImageAdapter
 from train.adapters.sdxl import SDXLAdapter
+from train.adapters.stable_diffusion_3 import StableDiffusion3Adapter
 from train.base_trainer import BaseDiffusionTrainer, collate_manifest_batch
 
 
@@ -119,6 +120,15 @@ class _FakeQwenPipeline:
         return prompt_embeds, prompt_mask
 
 
+class _FakeSD3Pipeline:
+    def encode_prompt(self, prompt, prompt_2, prompt_3, device, num_images_per_prompt, do_classifier_free_guidance):
+        del prompt_2, prompt_3, num_images_per_prompt, do_classifier_free_guidance
+        batch_size = len(prompt)
+        prompt_embeds = torch.ones(batch_size, 256, 24, device=device)
+        pooled_prompt_embeds = torch.ones(batch_size, 12, device=device)
+        return prompt_embeds, None, pooled_prompt_embeds, None
+
+
 class _FakeTransformer(nn.Module):
     def __init__(self, with_guidance: bool = False) -> None:
         super().__init__()
@@ -165,6 +175,21 @@ class _FakeQwenVAE(nn.Module):
         height = pixel_values.shape[-2] // 8
         width = pixel_values.shape[-1] // 8
         latents = self.anchor * torch.ones(batch_size, 4, 1, height, width, device=pixel_values.device)
+        return _EncodeOutput(latents)
+
+
+class _FakeSD3VAE(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.anchor = nn.Parameter(torch.ones(1), requires_grad=False)
+        self.dtype = torch.float32
+        self.config = SimpleNamespace(scaling_factor=1.5305, shift_factor=0.0609)
+
+    def encode(self, pixel_values: torch.Tensor) -> _EncodeOutput:
+        batch_size = pixel_values.shape[0]
+        height = pixel_values.shape[-2] // 8
+        width = pixel_values.shape[-1] // 8
+        latents = self.anchor * torch.ones(batch_size, 4, height, width, device=pixel_values.device)
         return _EncodeOutput(latents)
 
 
@@ -269,6 +294,44 @@ class _FakeQwenAdapter(QwenImageAdapter):
     def save_checkpoint(self, output_dir, accelerator=None):
         del accelerator
         Path(output_dir, "qwen.bin").write_bytes(b"qwen")
+
+    def load_checkpoint(self, input_dir, accelerator=None):
+        del input_dir, accelerator
+        return None
+
+    def build_validation_pipeline(self, accelerator):
+        del accelerator
+        raise AssertionError("validation should be disabled in smoke tests")
+
+
+class _FakeSD3Adapter(StableDiffusion3Adapter):
+    def setup(self, accelerator, weight_dtype):
+        self.pipeline = _FakeSD3Pipeline()
+        self.transformer = _FakeTransformer(with_guidance=False)
+        self.vae = _FakeSD3VAE()
+        self.text_encoder = nn.Identity()
+        self.text_encoder_2 = nn.Identity()
+        self.text_encoder_3 = nn.Identity()
+        self.tokenizer = object()
+        self.tokenizer_2 = object()
+        self.tokenizer_3 = object()
+        from diffusers import FlowMatchEulerDiscreteScheduler
+
+        self.scheduler = FlowMatchEulerDiscreteScheduler()
+        self.weight_dtype = weight_dtype
+        self.transformer.to(accelerator.device, dtype=weight_dtype)
+        self.vae.to(accelerator.device, dtype=weight_dtype)
+        self.text_encoder.to(accelerator.device)
+        self.text_encoder_2.to(accelerator.device)
+        self.text_encoder_3.to(accelerator.device)
+
+    def register_checkpointing_hooks(self, accelerator):
+        del accelerator
+        return None
+
+    def save_checkpoint(self, output_dir, accelerator=None):
+        del accelerator
+        Path(output_dir, "sd3.bin").write_bytes(b"sd3")
 
     def load_checkpoint(self, input_dir, accelerator=None):
         del input_dir, accelerator
@@ -385,6 +448,9 @@ class AdapterFamilyTrainerSmokeTest(unittest.TestCase):
 
     def test_qwen_trainer_smoke(self) -> None:
         self._run_trainer_smoke("qwenimage", _FakeQwenAdapter)
+
+    def test_sd3_trainer_smoke(self) -> None:
+        self._run_trainer_smoke("stable_diffusion_3", _FakeSD3Adapter)
 
 
 class AdapterFamilyBehaviorTest(unittest.TestCase):
