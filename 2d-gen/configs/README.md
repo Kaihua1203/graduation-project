@@ -2,7 +2,7 @@
 
 `train` config:
 
-- `model.family`: `stable_diffusion | sdxl | flux | qwenimage`
+- `model.family`: `stable_diffusion | stable_diffusion_3 | sdxl | flux | qwenimage`
 - `model.pretrained_model_name_or_path`: local diffusers model directory
 - `model.revision`: optional local revision
 - `model.variant`: optional diffusers variant
@@ -43,6 +43,14 @@
 - `distributed.find_unused_parameters`
 
 `bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`. Single-GPU launches can omit launcher flags, while multi-GPU launches must pass `--multi_gpu`, `--num_processes`, and a matching `CUDA_VISIBLE_DEVICES` list, for example `CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train_sd_lora_example.yaml --multi_gpu --num_processes 2`. Distributed launcher settings should be passed via `accelerate launch`, not stored in the YAML config.
+
+Train config examples in this directory:
+
+- `train_sd_lora_example.yaml`: Stable Diffusion LoRA example
+- `train_sd3_lora_example.yaml`: Stable Diffusion 3 LoRA example
+- `train_sdxl_lora_example.yaml`: SDXL LoRA example
+- `train_flux_lora_example.yaml`: FLUX LoRA example
+- `train_qwenimage_lora_example.yaml`: QwenImage LoRA example
 
 `standalone DreamBooth` config for `bash scripts/run_dreambooth_sd15.sh <config.yaml> [accelerate args...]`:
 
@@ -110,6 +118,7 @@
 - `model.lora_path`
 - `infer.prompts_path`: single `.txt` file or directory of `.txt` files
 - `infer.output_dir`
+- `infer.gpu_ids`: optional GPU id list, for example `[0]` or `[0,1,2,3]`
 - `infer.num_inference_steps`
 - `infer.guidance_scale`
 - `infer.height`
@@ -117,6 +126,8 @@
 - `infer.seed`
 
 Single-file inference keeps the existing line-by-line behavior. Directory-based inference processes `.txt` files in lexicographic order and treats each file as one prompt.
+When `infer.gpu_ids` has multiple GPU ids, `bash scripts/run_infer.sh` launches distributed inference through `accelerate launch --num_processes <len(gpu_ids)>`.
+Pass `--resume` to continue unfinished runs and skip existing `sample_*.png` files under `infer.output_dir`.
 
 `eval` config:
 
