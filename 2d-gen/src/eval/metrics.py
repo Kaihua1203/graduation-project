@@ -28,6 +28,10 @@ def list_images(directory: str | Path) -> list[Path]:
     return images
 
 
+def _log_progress(message: str) -> None:
+    print(f"[eval] {message}", flush=True)
+
+
 def pair_clip_i_paths(real_paths: list[Path], generated_paths: list[Path]) -> list[tuple[Path, Path]]:
     if len(real_paths) != len(generated_paths):
         raise ValueError("CLIP-I requires the same number of real and generated images.")
@@ -82,6 +86,12 @@ def _iter_image_batches(paths: list[Path], batch_size: int) -> Iterable[torch.Te
         yield batch
 
 
+def _iter_progress_steps(total_items: int, batch_size: int) -> tuple[int, int]:
+    total_batches = max(1, (total_items + batch_size - 1) // batch_size)
+    log_every = max(1, total_batches // 10)
+    return total_batches, log_every
+
+
 def compute_inception_features_and_probs(
     image_dir: str | Path,
     batch_size: int,
@@ -90,14 +100,21 @@ def compute_inception_features_and_probs(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = InceptionBackbone(inception_weights_path).to(device)
     image_paths = list_images(image_dir)
+    total_batches, log_every = _iter_progress_steps(len(image_paths), batch_size)
+    _log_progress(
+        f"Inception feature extraction from {image_dir} on {device.type} for {len(image_paths)} images "
+        f"({total_batches} batches, batch_size={batch_size})"
+    )
     all_features = []
     all_probs = []
-    for batch in _iter_image_batches(image_paths, batch_size=batch_size):
+    for batch_index, batch in enumerate(_iter_image_batches(image_paths, batch_size=batch_size), start=1):
         batch = batch.to(device)
         logits, features = model(batch)
         probs = F.softmax(logits, dim=1)
         all_features.append(np.asarray(features.detach().cpu().float().tolist(), dtype=np.float64))
         all_probs.append(np.asarray(probs.detach().cpu().float().tolist(), dtype=np.float64))
+        if batch_index == 1 or batch_index % log_every == 0 or batch_index == total_batches:
+            _log_progress(f"Inception batches: {batch_index}/{total_batches}")
     return np.concatenate(all_features, axis=0), np.concatenate(all_probs, axis=0)
 
 
@@ -190,8 +207,12 @@ def compute_clip_t(
     manifest_path = Path(generated_manifest_path).expanduser().resolve()
     model, tokenizer, device = _load_clip(clip_model_path)
     similarities = []
+    lines = [line for line in manifest_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    total_records = len(lines)
+    log_every = max(1, total_records // 10) if total_records else 1
+    _log_progress(f"CLIP-T from {manifest_path} on {device.type} for {total_records} prompt/image pairs")
     with manifest_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
+        for record_index, line in enumerate(handle, start=1):
             if not line.strip():
                 continue
             record = json.loads(line)
@@ -209,6 +230,8 @@ def compute_clip_t(
             similarities.append(
                 float(torch.sum(image_embeds * text_embeds, dim=-1).mean().cpu().item())
             )
+            if record_index == 1 or record_index % log_every == 0 or record_index == total_records:
+                _log_progress(f"CLIP-T pairs: {record_index}/{total_records}")
     if not similarities:
         raise ValueError(f"No prompt/image pairs found in {manifest_path}")
     return float(np.mean(similarities))
@@ -224,7 +247,11 @@ def compute_clip_i(
     generated_paths = list_images(generated_image_dir)
     model, tokenizer, device = _load_clip(clip_model_path)
     similarities = []
-    for real_path, generated_path in pair_clip_i_paths(real_paths, generated_paths):
+    paired_paths = pair_clip_i_paths(real_paths, generated_paths)
+    total_pairs = len(paired_paths)
+    log_every = max(1, total_pairs // 10) if total_pairs else 1
+    _log_progress(f"CLIP-I on {device.type} for {total_pairs} aligned image pairs")
+    for pair_index, (real_path, generated_path) in enumerate(paired_paths, start=1):
         real_image = Image.open(real_path).convert("RGB")
         generated_image = Image.open(generated_path).convert("RGB")
         pixel_values = torch.stack(
@@ -235,6 +262,8 @@ def compute_clip_i(
         similarities.append(
             float(torch.sum(image_embeds[0] * image_embeds[1], dim=-1).cpu().item())
         )
+        if pair_index == 1 or pair_index % log_every == 0 or pair_index == total_pairs:
+            _log_progress(f"CLIP-I pairs: {pair_index}/{total_pairs}")
     return float(np.mean(similarities))
 
 
@@ -246,12 +275,17 @@ def evaluate_generation_quality(
     inception_weights_path: str | Path = DEFAULT_INCEPTION_WEIGHTS_PATH,
     clip_model_path: str | Path = DEFAULT_CLIP_MODEL_PATH,
 ) -> MetricResult:
+    _log_progress("Starting FID")
     fid = compute_fid(real_image_dir, generated_image_dir, batch_size, inception_weights_path)
+    _log_progress("Starting Inception Score")
     is_mean, is_std = compute_inception_score(
         generated_image_dir, batch_size, inception_weights_path
     )
+    _log_progress("Starting CLIP-I")
     clip_i = compute_clip_i(real_image_dir, generated_image_dir, clip_model_path)
+    _log_progress("Starting CLIP-T")
     clip_t = compute_clip_t(generated_manifest_path, clip_model_path)
+    _log_progress("Finished evaluation")
     return MetricResult(
         fid=fid,
         inception_score_mean=is_mean,

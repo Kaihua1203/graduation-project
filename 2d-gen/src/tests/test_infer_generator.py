@@ -132,7 +132,8 @@ class InferGeneratorTest(unittest.TestCase):
 
             output_dir.mkdir(parents=True, exist_ok=True)
             for index in existing_indices or []:
-                image_path = output_dir / f"sample_{index:05d}.png"
+                prompt_records = generator.collect_prompt_records(prompts_path)
+                image_path = generator._build_output_image_path(output_dir, index, prompt_records[index])
                 Image.new("RGB", (4, 4), color=(255, 255, 255)).save(image_path)
 
             fake_partial_state = _build_fake_partial_state_class(
@@ -192,9 +193,10 @@ class InferGeneratorTest(unittest.TestCase):
 
             records, output_files, split_inputs = self._run_fake_inference(prompts_dir)
 
-        self.assertEqual(output_files, ["sample_00000.png", "sample_00001.png"])
+        self.assertEqual(output_files, ["a.png", "b.png"])
         self.assertEqual([record["prompt"] for record in records], ["first prompt", "second prompt"])
         self.assertEqual([record["sample_index"] for record in records], [0, 1])
+        self.assertEqual([Path(record["image_path"]).name for record in records], ["a.png", "b.png"])
         self.assertEqual([record["prompt_source_kind"] for record in records], ["directory_file", "directory_file"])
         self.assertEqual([record["prompt_source_index"] for record in records], [1, 2])
         self.assertEqual(
@@ -218,6 +220,26 @@ class InferGeneratorTest(unittest.TestCase):
         self.assertEqual(output_files, ["sample_00000.png", "sample_00001.png", "sample_00002.png"])
         self.assertEqual([record["sample_index"] for record in records], [2])
         self.assertEqual([record["prompt"] for record in records], ["third prompt"])
+        self.assertEqual(split_inputs, [[2]])
+        self.assertEqual(_FakeStableDiffusionPipeline.last_instance.prompts, ["third prompt"])
+
+    def test_directory_resume_skips_existing_prompt_basename_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prompts_dir = Path(tmpdir) / "prompts"
+            prompts_dir.mkdir()
+            (prompts_dir / "a.txt").write_text("first prompt\n", encoding="utf-8")
+            (prompts_dir / "b.txt").write_text("second prompt\n", encoding="utf-8")
+            (prompts_dir / "c.txt").write_text("third prompt\n", encoding="utf-8")
+
+            records, output_files, split_inputs = self._run_fake_inference(
+                prompts_dir,
+                resume=True,
+                existing_indices=[0, 1],
+            )
+
+        self.assertEqual(output_files, ["a.png", "b.png", "c.png"])
+        self.assertEqual([record["sample_index"] for record in records], [2])
+        self.assertEqual([Path(record["image_path"]).name for record in records], ["c.png"])
         self.assertEqual(split_inputs, [[2]])
         self.assertEqual(_FakeStableDiffusionPipeline.last_instance.prompts, ["third prompt"])
 

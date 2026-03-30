@@ -88,13 +88,24 @@ def _normalize_gpu_ids(infer_cfg: dict[str, Any]) -> list[int]:
     return normalized_gpu_ids
 
 
-def _discover_completed_sample_indices(output_dir: Path) -> set[int]:
+def _build_output_image_path(output_dir: Path, sample_index: int, prompt_record: dict[str, Any]) -> Path:
+    if prompt_record["prompt_source_kind"] == "directory_file":
+        prompt_source_path = Path(prompt_record["prompt_source_path"])
+        return output_dir / f"{prompt_source_path.stem}.png"
+    return output_dir / f"sample_{sample_index:05d}.png"
+
+
+def _discover_completed_sample_indices(output_dir: Path, prompt_records: list[dict[str, Any]]) -> set[int]:
     completed_indices: set[int] = set()
-    for image_path in output_dir.glob("sample_*.png"):
-        match = SAMPLE_IMAGE_PATTERN.match(image_path.name)
-        if not match:
+    for sample_index, prompt_record in enumerate(prompt_records):
+        image_path = _build_output_image_path(output_dir, sample_index, prompt_record)
+        if image_path.exists():
+            completed_indices.add(sample_index)
             continue
-        completed_indices.add(int(match.group(1)))
+
+        match = SAMPLE_IMAGE_PATTERN.match(image_path.name)
+        if match is not None and (output_dir / image_path.name).exists():
+            completed_indices.add(int(match.group(1)))
     return completed_indices
 
 
@@ -155,7 +166,7 @@ def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
     pipe.load_lora_weights(model_cfg["lora_path"])
 
     seed = int(infer_cfg.get("seed", 3407))
-    completed_indices = _discover_completed_sample_indices(output_dir) if resume else set()
+    completed_indices = _discover_completed_sample_indices(output_dir, prompt_records) if resume else set()
     all_indices = list(range(len(prompt_records)))
     pending_indices = [index for index in all_indices if index not in completed_indices]
     if not pending_indices:
@@ -177,7 +188,7 @@ def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
                 width=infer_cfg["width"],
                 generator=generator,
             ).images[0]
-            image_path = output_dir / f"sample_{index:05d}.png"
+            image_path = _build_output_image_path(output_dir, index, prompt_record)
             image.save(image_path)
             local_records.append(
                 {
@@ -217,7 +228,11 @@ def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
 def parse_args(input_args: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run 2d-gen inference.")
     parser.add_argument("--config", required=True)
-    parser.add_argument("--resume", action="store_true", help="Resume inference from existing sample_*.png outputs.")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume inference from existing outputs based on the configured prompt source.",
+    )
     return parser.parse_args(input_args)
 
 
