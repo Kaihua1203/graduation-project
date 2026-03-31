@@ -131,7 +131,7 @@ def _read_jsonl_records(input_path: Path) -> list[dict[str, Any]]:
 
 def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
     prepare_diffusers_import()
-    from diffusers import StableDiffusion3Pipeline, StableDiffusionPipeline
+    from diffusers import FluxPipeline, StableDiffusion3Pipeline, StableDiffusionPipeline
     from accelerate import PartialState
 
     model_cfg = ensure_section(config, "model")
@@ -153,6 +153,8 @@ def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
         pipeline_cls = StableDiffusionPipeline
     elif family == "stable_diffusion_3":
         pipeline_cls = StableDiffusion3Pipeline
+    elif family == "flux":
+        pipeline_cls = FluxPipeline
     else:
         raise NotImplementedError(f"Inference for {family} is not implemented yet.")
 
@@ -180,14 +182,15 @@ def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
             prompt_record = prompt_records[index]
             prompt = prompt_record["prompt"]
             generator = torch.Generator(device=device.type).manual_seed(seed + index)
-            image = pipe(
-                prompt=prompt,
-                num_inference_steps=infer_cfg["num_inference_steps"],
-                guidance_scale=infer_cfg["guidance_scale"],
-                height=infer_cfg["height"],
-                width=infer_cfg["width"],
-                generator=generator,
-            ).images[0]
+            inference_kwargs: dict[str, Any] = {
+                "prompt": prompt,
+                "num_inference_steps": infer_cfg["num_inference_steps"],
+                "guidance_scale": infer_cfg["guidance_scale"],
+                "height": infer_cfg["height"],
+                "width": infer_cfg["width"],
+                "generator": generator,
+            }
+            image = pipe(**inference_kwargs).images[0]
             image_path = _build_output_image_path(output_dir, index, prompt_record)
             image.save(image_path)
             local_records.append(
@@ -240,7 +243,7 @@ def main() -> None:
     args = parse_args()
     config = load_yaml_config(args.config)
     family = ensure_section(config, "model")["family"]
-    if family not in {"stable_diffusion", "stable_diffusion_3"}:
+    if family not in {"stable_diffusion", "stable_diffusion_3", "flux"}:
         raise NotImplementedError(f"Inference for {family} is not implemented yet.")
     run_stable_diffusion_inference(config, resume=args.resume)
 

@@ -53,6 +53,18 @@ class _FakeStableDiffusion3Pipeline(_FakeStableDiffusionPipeline):
         return instance
 
 
+class _FakeFluxPipeline(_FakeStableDiffusionPipeline):
+    last_instance: "_FakeFluxPipeline | None" = None
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs) -> "_FakeFluxPipeline":
+        instance = cls()
+        instance.from_pretrained_args = args
+        instance.from_pretrained_kwargs = kwargs
+        cls.last_instance = instance
+        return instance
+
+
 def _build_fake_partial_state_class(
     *,
     split_indices: list[int] | None = None,
@@ -147,13 +159,14 @@ class InferGeneratorTest(unittest.TestCase):
                 mock.patch.object(generator.torch.cuda, "is_available", return_value=False),
                 mock.patch.dict(
                     sys.modules,
-                    {
-                        "diffusers": types.SimpleNamespace(
-                            StableDiffusionPipeline=_FakeStableDiffusionPipeline,
-                            StableDiffusion3Pipeline=_FakeStableDiffusion3Pipeline,
-                        ),
-                        "accelerate": types.SimpleNamespace(PartialState=fake_partial_state),
-                    },
+                        {
+                            "diffusers": types.SimpleNamespace(
+                                FluxPipeline=_FakeFluxPipeline,
+                                StableDiffusionPipeline=_FakeStableDiffusionPipeline,
+                                StableDiffusion3Pipeline=_FakeStableDiffusion3Pipeline,
+                            ),
+                            "accelerate": types.SimpleNamespace(PartialState=fake_partial_state),
+                        },
                 ),
             ):
                 generator.run_stable_diffusion_inference(config, resume=resume)
@@ -273,6 +286,21 @@ class InferGeneratorTest(unittest.TestCase):
         self.assertEqual([record["prompt"] for record in records], ["sd3 prompt"])
         self.assertEqual(split_inputs, [[0]])
         self.assertEqual(_FakeStableDiffusion3Pipeline.last_instance.prompts, ["sd3 prompt"])
+
+    def test_flux_inference_uses_flux_pipeline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prompts_file = Path(tmpdir) / "prompts.txt"
+            prompts_file.write_text("flux prompt\n", encoding="utf-8")
+
+            records, output_files, split_inputs = self._run_fake_inference(
+                prompts_file,
+                family="flux",
+            )
+
+        self.assertEqual(output_files, ["sample_00000.png"])
+        self.assertEqual([record["prompt"] for record in records], ["flux prompt"])
+        self.assertEqual(split_inputs, [[0]])
+        self.assertEqual(_FakeFluxPipeline.last_instance.prompts, ["flux prompt"])
 
 
 if __name__ == "__main__":
