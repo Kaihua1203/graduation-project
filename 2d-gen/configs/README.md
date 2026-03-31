@@ -134,7 +134,7 @@ Pass `--resume` to continue unfinished runs and skip existing `sample_*.png` fil
 - `eval.real_image_dir`
 - `eval.generated_image_dir`
 - `eval.generated_manifest`
-- `eval.output_path`
+- `eval.output_path`: base output filename; eval writes a timestamped file such as `metrics_20260331_123456.json`
 - `eval.batch_size`
 - `eval.num_workers`
 - `eval.real_inception_cache_dir`: optional cache directory for real-image Inception features/probabilities

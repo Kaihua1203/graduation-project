@@ -140,6 +140,12 @@ bash scripts/run_build_manifest.sh \
 The builder matches files by the same stem, for example `images/0001.png` with `prompts/0001.txt`.
 It only scans the first directory level and writes absolute `image_path` entries into the JSONL.
 
+Evaluation notes:
+
+- `bash scripts/run_eval.sh <config.yaml>` writes a timestamped metrics file based on `eval.output_path`, for example `metrics_20260331_123456.json`, so repeated runs do not overwrite each other.
+- `eval.real_inception_cache_dir` stores cached real-image Inception features/probabilities for reuse across runs. The first run builds the cache; later runs with the same real set and Inception weights reuse it.
+- `eval.num_workers` now controls eval-side image loading workers for both Inception and CLIP metrics.
+
 Override the venv when needed:
 
 ```bash
