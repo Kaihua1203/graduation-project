@@ -5,13 +5,18 @@ Read `ARCHITECTURE.md` for the current repository layout and module map.
 
 ## Project Environment Rules
 - Before starting implementation work, first align with the user on which project environment or `venv` should be used. Do not assume the environment if the user has not specified it.
-- For example: When working in the `2d-gen` repository, use the virtual environment located at `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers`.
+- When working in the `2d-gen` repository, use the virtual environment located at `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers`.
 
 ## Coding Style & Naming Conventions
 - Python code uses 4-space indentation and standard PEP 8 naming.
 - Use `snake_case` for functions/variables, `PascalCase` for classes.
 - Config files are YAML; keep keys lower_snake_case and group related settings together.
 - No formatter/linter is configured; keep changes small and consistent with nearby code.
+
+## Test Execution Rules
+- For work in `2d-gen`, always run test commands with `PYTHONPATH=2d-gen/src` so imports resolve against the repository source tree.
+- Prefer running tests from the repository root with the environment set inline, for example: `PYTHONPATH=2d-gen/src pytest ...`
+- Do not assume a specific virtual environment. If a command depends on one, first align with the user according to `Project Environment Rules`.
 
 ## Commit & Pull Request Guidelines
 - Use conventional commits with short, imperative subjects:

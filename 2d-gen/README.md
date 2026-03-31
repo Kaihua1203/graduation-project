@@ -95,6 +95,7 @@ Run from `2d-gen/`:
 bash scripts/run_train.sh configs/train_sd_lora_example.yaml
 bash scripts/run_dreambooth_sd15.sh configs/train_sd15_dreambooth_example.yaml
 bash scripts/run_infer.sh configs/infer_sd_example.yaml
+bash scripts/run_infer.sh configs/infer_sd_example.yaml --resume
 bash scripts/run_eval.sh configs/eval_example.yaml
 ```
 
@@ -146,6 +147,7 @@ VENV_DIR=/some/other/venv bash scripts/run_train.sh configs/train_sd_lora_exampl
 ```
 
 Single-GPU execution still works without `--multi_gpu`; multi-GPU runs must set `CUDA_VISIBLE_DEVICES` and match `--num_processes` to the visible GPU count.
+Inference can also run on multiple GPUs by setting `infer.gpu_ids` in the infer YAML. If multiple ids are configured, `scripts/run_infer.sh` automatically launches `accelerate` distributed inference. Use `--resume` to skip already generated `sample_*.png` outputs and continue an interrupted run.
 
 ## Metric Assumptions
 
