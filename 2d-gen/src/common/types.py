@@ -37,5 +37,7 @@ class MetricResult:
     fid: float
     inception_score_mean: float
     inception_score_std: float
-    clip_i: float
-    clip_t: float
+    clip_i_mean: float
+    clip_i_std: float
+    clip_t_mean: float
+    clip_t_std: float

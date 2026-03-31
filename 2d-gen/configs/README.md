@@ -137,5 +137,6 @@ Pass `--resume` to continue unfinished runs and skip existing `sample_*.png` fil
 - `eval.output_path`
 - `eval.batch_size`
 - `eval.num_workers`
+- `eval.real_inception_cache_dir`: optional cache directory for real-image Inception features/probabilities
 - `eval.inception_weights_path`
 - `eval.clip_model_path`

@@ -3,11 +3,20 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import numpy as np
+import torch
 from PIL import Image
 
-from eval.metrics import frechet_distance, list_images, pair_clip_i_paths
+from eval.metrics import (
+    _build_inception_cache_path,
+    _load_manifest_records,
+    evaluate_generation_quality,
+    frechet_distance,
+    list_images,
+    pair_clip_i_paths,
+)
 
 
 class MetricsSmokeTest(unittest.TestCase):
@@ -31,6 +40,71 @@ class MetricsSmokeTest(unittest.TestCase):
         generated_paths = [Path("a.png"), Path("c.png")]
         with self.assertRaises(ValueError):
             pair_clip_i_paths(real_paths, generated_paths)
+
+    def test_load_manifest_records_skips_blank_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "metadata.jsonl"
+            manifest_path.write_text(
+                '\n{"image_path": "/tmp/sample.png", "prompt": "slice"}\n\n',
+                encoding="utf-8",
+            )
+            records = _load_manifest_records(manifest_path)
+            self.assertEqual(records, [{"image_path": "/tmp/sample.png", "prompt": "slice"}])
+
+    def test_build_inception_cache_path_changes_when_source_file_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            image_path = tmpdir_path / "sample.png"
+            weights_path = tmpdir_path / "weights.pth"
+            cache_dir = tmpdir_path / "cache"
+            Image.new("RGB", (16, 16), color=(255, 0, 0)).save(image_path)
+            weights_path.write_bytes(b"weights")
+            first_cache_path = _build_inception_cache_path([image_path], weights_path, cache_dir)
+            image_path.write_bytes(image_path.read_bytes() + b"changed")
+            second_cache_path = _build_inception_cache_path([image_path], weights_path, cache_dir)
+            self.assertNotEqual(first_cache_path, second_cache_path)
+
+    def test_evaluate_generation_quality_returns_expected_metric_fields(self) -> None:
+        real_features = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)
+        generated_features = np.array([[5.0, 6.0], [7.0, 8.0]], dtype=np.float64)
+        generated_probs = np.array([[0.2, 0.8], [0.4, 0.6]], dtype=np.float64)
+        with (
+            patch("eval.metrics._load_inception_backbone", return_value=(MagicMock(), torch.device("cpu"))),
+            patch(
+                "eval.metrics.compute_inception_features_and_probs",
+                side_effect=[
+                    (real_features, np.zeros((2, 2), dtype=np.float64)),
+                    (generated_features, generated_probs),
+                ],
+            ) as mock_inception,
+            patch("eval.metrics.compute_fid", return_value=12.345),
+            patch("eval.metrics.compute_inception_score", return_value=(1.234, 0.567)),
+            patch("eval.metrics.compute_clip_i", return_value=(0.876, 0.123)),
+            patch("eval.metrics.compute_clip_t", return_value=(0.765, 0.234)),
+        ):
+            result = evaluate_generation_quality(
+                real_image_dir="/tmp/real",
+                generated_image_dir="/tmp/generated",
+                generated_manifest_path="/tmp/generated/metadata.jsonl",
+                batch_size=4,
+                num_workers=2,
+                inception_weights_path="/tmp/inception.pth",
+                clip_model_path="/tmp/clip",
+                real_inception_cache_dir="/tmp/cache",
+            )
+        self.assertEqual(mock_inception.call_count, 2)
+        self.assertEqual(
+            result.__dict__,
+            {
+                "fid": 12.35,
+                "inception_score_mean": 1.23,
+                "inception_score_std": 0.57,
+                "clip_i_mean": 0.88,
+                "clip_i_std": 0.12,
+                "clip_t_mean": 0.77,
+                "clip_t_std": 0.23,
+            },
+        )
 
 
 if __name__ == "__main__":
