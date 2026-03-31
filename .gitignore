@@ -21,3 +21,4 @@ lightning_logs/
 *.pth
 .codex
 2d-gen/tasks/
+.pytest_cache

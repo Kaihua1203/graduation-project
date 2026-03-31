@@ -163,6 +163,8 @@ def run_stable_diffusion_inference(config: dict, resume: bool = False) -> None:
     }
     if family == "stable_diffusion":
         pipeline_kwargs["safety_checker"] = None
+    if family == "flux":
+        pipeline_kwargs["torch_dtype"] = torch.bfloat16
 
     pipe = pipeline_cls.from_pretrained(model_cfg["pretrained_path"], **pipeline_kwargs).to(device)
     pipe.load_lora_weights(model_cfg["lora_path"])
