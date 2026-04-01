@@ -1,12 +1,13 @@
 model:
   family: stable_diffusion
   pretrained_path: /abs/path/to/stable-diffusion-model
-  lora_path: /abs/path/to/outputs/sd_lora_example/checkpoints/final_lora
+  lora_path: /abs/path/to/outputs/train/sd_lora_example/checkpoints/final_lora
   local_files_only: true
 
 infer:
   prompts_path: /abs/path/to/prompts.txt  # or /abs/path/to/prompt_dir
-  output_dir: outputs/sd_infer_example
+  output_dir: outputs/infer/sd_infer_example
+  gpu_ids: [0]  # set multiple ids like [0,1,2,3] for distributed inference
   num_inference_steps: 30
   guidance_scale: 7.5
   height: 512

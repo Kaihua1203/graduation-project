@@ -17,7 +17,7 @@ data:
   image_interpolation_mode: lanczos
 
 train:
-  output_dir: outputs/sd15_dreambooth_example
+  output_dir: outputs/train/sd15_dreambooth_example
   seed: 3407
   train_batch_size: 1
   sample_batch_size: 4

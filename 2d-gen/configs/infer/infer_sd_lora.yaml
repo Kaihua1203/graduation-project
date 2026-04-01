@@ -1,0 +1,15 @@
+model:
+  family: stable_diffusion
+  pretrained_path:  /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-v1-5
+  lora_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd_lora_2gpu_2000/checkpoints/final_lora
+  local_files_only: true
+
+infer:
+  prompts_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/test/LiTS/prompts # or /abs/path/to/prompt_dir
+  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/infer/sd_2gpu_2000_infer
+  gpu_ids: [0] 
+  num_inference_steps: 50
+  guidance_scale: 7.5
+  height: 512
+  width: 512
+  seed: 3407

@@ -387,7 +387,7 @@ class RunTrainScriptSmokeTest(unittest.TestCase):
     def test_single_gpu_launch_is_unchanged(self) -> None:
         repo_root = Path("/tmp/2d-gen-thread-1-train-logging/2d-gen")
         script = repo_root / "scripts" / "run_train.sh"
-        config_path = repo_root / "configs" / "train_sd_lora_example.yaml"
+        config_path = repo_root / "configs" / "train" / "train_sd_lora_example.yaml"
 
         with tempfile.TemporaryDirectory() as tmpdir:
             env = self._make_env(Path(tmpdir))
@@ -410,7 +410,7 @@ class RunTrainScriptSmokeTest(unittest.TestCase):
     def test_multi_gpu_launch_requires_visible_devices_and_matching_processes(self) -> None:
         repo_root = Path("/tmp/2d-gen-thread-1-train-logging/2d-gen")
         script = repo_root / "scripts" / "run_train.sh"
-        config_path = repo_root / "configs" / "train_sd_lora_example.yaml"
+        config_path = repo_root / "configs" / "train" / "train_sd_lora_example.yaml"
 
         with tempfile.TemporaryDirectory() as tmpdir:
             env = self._make_env(Path(tmpdir))

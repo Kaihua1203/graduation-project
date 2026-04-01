@@ -1,41 +1,41 @@
 model:
-  family: stable_diffusion_3
-  pretrained_model_name_or_path: /abs/path/to/stable-diffusion-3-model
+  family: sdxl
+  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-xl-base-1.0
   pretrained_vae_model_name_or_path: null
   revision: null
   variant: null
   local_files_only: true
 
 data:
-  train_manifest: /abs/path/to/train_manifest.jsonl
+  train_manifest: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/MedSegFactory/train-png/LiTS2017/train.jsonl
   image_column: image_path
   caption_column: prompt
-  resolution: 512
+  resolution: 1024
   center_crop: false
   random_flip: false
   image_interpolation_mode: bilinear
   max_train_samples: null
 
 train:
-  output_dir: outputs/sd3_lora_example
+  output_dir: outputs/train/sdxl_lora_example
   seed: 3407
   train_batch_size: 1
-  num_train_epochs: 1
-  max_train_steps: 20
-  gradient_accumulation_steps: 1
+  num_train_epochs: 10
+  max_train_steps: 2000
+  gradient_accumulation_steps: 16
   learning_rate: 1.0e-4
   scale_lr: false
   lr_scheduler: constant
   lr_warmup_steps: 0
   gradient_checkpointing: true
-  mixed_precision: bf16
+  mixed_precision: fp16
   snr_gamma: null
   prediction_type: null
   noise_offset: 0.0
   max_grad_norm: 1.0
   allow_tf32: false
   dataloader_num_workers: 2
-  checkpointing_steps: 20
+  checkpointing_steps: 400
   checkpoints_total_limit: null
   resume_from_checkpoint: null
   enable_xformers_memory_efficient_attention: false
@@ -46,33 +46,29 @@ train:
     adam_weight_decay: 1.0e-2
     adam_epsilon: 1.0e-8
   lora:
-    rank: 8
+    rank: 16
     alpha: 16
     dropout: 0.0
     target_modules:
-      - attn.add_k_proj
-      - attn.add_q_proj
-      - attn.add_v_proj
-      - attn.to_add_out
-      - attn.to_k
-      - attn.to_out.0
-      - attn.to_q
-      - attn.to_v
+      - to_k
+      - to_q
+      - to_v
+      - to_out.0
   sdxl:
     train_text_encoder: false
     enable_npu_flash_attention: false
     debug_loss: false
 
 validation:
-  validation_prompt: null
+  validation_prompt: a medical abdomen CT slice with liver anatomy.
   num_validation_images: 4
-  validation_steps: 20
+  validation_steps: 400
 
 logging:
   report_to: swanlab
   logging_dir: logs
-  project_name: 2d-gen-train
-  experiment_name: sd3_lora_example
+  project_name: 2d-gen
+  experiment_name: train_sdxl_lora_example
 
 distributed:
   find_unused_parameters: false

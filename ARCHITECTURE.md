@@ -96,10 +96,16 @@ graduation-project/
 │   └── tests/
 ├── configs/
 │   ├── README.md
-│   ├── train_sd_lora.yaml
-│   ├── train_sd_lora_example.yaml
-│   ├── infer_sd_example.yaml
-│   └── eval_example.yaml
+│   ├── train/
+│   │   ├── train_sd_lora.yaml
+│   │   ├── train_sd_lora_example.yaml
+│   │   └── ...
+│   ├── infer/
+│   │   ├── infer_sd_example.yaml
+│   │   └── ...
+│   └── eval/
+│       ├── eval_example.yaml
+│       └── ...
 ├── scripts/
 │   ├── run_with_venv.sh
 │   ├── run_train.sh
@@ -107,6 +113,9 @@ graduation-project/
 │   ├── run_eval.sh
 │   └── run_build_manifest.sh
 ├── outputs/
+│   ├── eval/
+│   ├── infer/
+│   └── train/
 ├── requirements.txt
 ├── CHANGELOG.md
 └── README.md
@@ -141,14 +150,14 @@ graduation-project/
   - Focused smoke and validation tests for config loading, datasets, manifest building, metrics, lazy imports, and adapter shape checks.
 
 - `configs/`
-  - YAML examples for training, inference, and evaluation runs.
-  - `train_sd_lora.yaml` is the current concrete Stable Diffusion LoRA training config.
+  - YAML examples grouped under `train/`, `infer/`, and `eval/`.
+  - `train/train_sd_lora.yaml` is the current concrete Stable Diffusion LoRA training config.
 
 - `scripts/`
   - Thin shell wrappers that activate the selected venv and launch train/infer/eval or manifest-building workflows.
 
 - `outputs/`
-  - Runtime artifacts such as LoRA checkpoints, generated images, and evaluation summaries.
+  - Runtime artifacts grouped under `train/`, `infer/`, and `eval/` for training runs, generated images, and evaluation summaries.
 
 ## 5) `2d-ssl-seg` Module Responsibilities
 

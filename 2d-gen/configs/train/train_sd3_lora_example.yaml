@@ -1,6 +1,6 @@
 model:
-  family: stable_diffusion
-  pretrained_model_name_or_path: /abs/path/to/stable-diffusion-model
+  family: stable_diffusion_3
+  pretrained_model_name_or_path: /abs/path/to/stable-diffusion-3-model
   pretrained_vae_model_name_or_path: null
   revision: null
   variant: null
@@ -17,9 +17,9 @@ data:
   max_train_samples: null
 
 train:
-  output_dir: outputs/sd_lora_example
+  output_dir: outputs/train/sd3_lora_example
   seed: 3407
-  train_batch_size: 2
+  train_batch_size: 1
   num_train_epochs: 1
   max_train_steps: 20
   gradient_accumulation_steps: 1
@@ -27,8 +27,8 @@ train:
   scale_lr: false
   lr_scheduler: constant
   lr_warmup_steps: 0
-  gradient_checkpointing: false
-  mixed_precision: fp16
+  gradient_checkpointing: true
+  mixed_precision: bf16
   snr_gamma: null
   prediction_type: null
   noise_offset: 0.0
@@ -50,10 +50,14 @@ train:
     alpha: 16
     dropout: 0.0
     target_modules:
-      - to_k
-      - to_q
-      - to_v
-      - to_out.0
+      - attn.add_k_proj
+      - attn.add_q_proj
+      - attn.add_v_proj
+      - attn.to_add_out
+      - attn.to_k
+      - attn.to_out.0
+      - attn.to_q
+      - attn.to_v
   sdxl:
     train_text_encoder: false
     enable_npu_flash_attention: false
@@ -68,7 +72,7 @@ logging:
   report_to: swanlab
   logging_dir: logs
   project_name: 2d-gen-train
-  experiment_name: sd_lora_example
+  experiment_name: sd3_lora_example
 
 distributed:
   find_unused_parameters: false

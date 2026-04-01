@@ -21,8 +21,8 @@ from train.run_dreambooth_sd15 import (
 
 class DreamBoothSd15SmokeTest(unittest.TestCase):
     def test_parse_args_accepts_config_flag(self) -> None:
-        args = parse_args(["--config", "configs/train_sd15_dreambooth_example.yaml"])
-        self.assertEqual(args.config, "configs/train_sd15_dreambooth_example.yaml")
+        args = parse_args(["--config", "configs/train/train_sd15_dreambooth_example.yaml"])
+        self.assertEqual(args.config, "configs/train/train_sd15_dreambooth_example.yaml")
 
     def test_load_config_normalizes_local_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -27,7 +27,9 @@ Planned next:
 
 ## Layout
 
-- `configs/`: example train/infer/eval configs
+- `configs/train/`: train configs
+- `configs/infer/`: inference configs
+- `configs/eval/`: evaluation configs
 - `scripts/`: shell wrappers
 - `src/common/`: config, paths, shared runtime objects
 - `src/data/`: manifest dataset loader
@@ -35,7 +37,9 @@ Planned next:
 - `src/train/run_dreambooth_sd15.py`: standalone SD1.5 DreamBooth LoRA trainer
 - `src/infer/`: generation entrypoint
 - `src/eval/`: metric implementations and evaluation runner
-- `outputs/`: checkpoints, generated images, metrics, logs
+- `outputs/train/`: checkpoints and logs for training runs
+- `outputs/infer/`: generated images and manifests
+- `outputs/eval/`: evaluation metrics and caches
 
 ## Dataset Contract
 
@@ -92,18 +96,18 @@ export DIFFUSERS_SRC_PATH=/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/dif
 Run from `2d-gen/`:
 
 ```bash
-bash scripts/run_train.sh configs/train_sd_lora_example.yaml
-bash scripts/run_dreambooth_sd15.sh configs/train_sd15_dreambooth_example.yaml
-bash scripts/run_infer.sh configs/infer_sd_example.yaml
-bash scripts/run_infer.sh configs/infer_sd_example.yaml --resume
-bash scripts/run_eval.sh configs/eval_example.yaml
+bash scripts/run_train.sh configs/train/train_sd_lora_example.yaml
+bash scripts/run_dreambooth_sd15.sh configs/train/train_sd15_dreambooth_example.yaml
+bash scripts/run_infer.sh configs/infer/infer_sd_example.yaml
+bash scripts/run_infer.sh configs/infer/infer_sd_example.yaml --resume
+bash scripts/run_eval.sh configs/eval/eval_example.yaml
 ```
 
 `scripts/run_train.sh` now wraps `accelerate launch`. Pass extra launcher arguments after the config path:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train_sd_lora_example.yaml --multi_gpu --num_processes 2
-bash scripts/run_dreambooth_sd15.sh configs/train_sd15_dreambooth_example.yaml --num_processes 2
+CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train/train_sd_lora_example.yaml --multi_gpu --num_processes 2
+bash scripts/run_dreambooth_sd15.sh configs/train/train_sd15_dreambooth_example.yaml --num_processes 2
 ```
 
 The train config follows a diffusers-style schema with top-level `model`, `data`, `train`, `validation`, `logging`, and `distributed` sections. Legacy keys such as `model.pretrained_path`, `train.batch_size`, and `train.num_epochs` are rejected.
@@ -149,7 +153,7 @@ Evaluation notes:
 Override the venv when needed:
 
 ```bash
-VENV_DIR=/some/other/venv bash scripts/run_train.sh configs/train_sd_lora_example.yaml
+VENV_DIR=/some/other/venv bash scripts/run_train.sh configs/train/train_sd_lora_example.yaml
 ```
 
 Single-GPU execution still works without `--multi_gpu`; multi-GPU runs must set `CUDA_VISIBLE_DEVICES` and match `--num_processes` to the visible GPU count.

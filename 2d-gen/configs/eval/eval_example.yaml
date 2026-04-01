@@ -2,7 +2,7 @@ eval:
   real_image_dir: /abs/path/to/real_images
   generated_image_dir: /abs/path/to/generated_images
   generated_manifest: /abs/path/to/generated_images/metadata.jsonl
-  output_path: outputs/eval_example/metrics.json
+  output_path: outputs/eval/eval_example/metrics.json
   batch_size: 8
   num_workers: 4
   real_inception_cache_dir: outputs/eval_example/cache

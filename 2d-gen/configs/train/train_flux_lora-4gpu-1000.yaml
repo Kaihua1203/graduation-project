@@ -1,6 +1,6 @@
 model:
-  family: stable_diffusion
-  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-v1-5
+  family: flux
+  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/black-forest-labs/FLUX.1-dev
   pretrained_vae_model_name_or_path: null
   revision: null
   variant: null
@@ -17,25 +17,25 @@ data:
   max_train_samples: null
 
 train:
-  output_dir: outputs/sd_lora
+  output_dir: outputs/train/flux_lora_4gpu_1000
   seed: 3407
   train_batch_size: 1
   num_train_epochs: 10
-  max_train_steps: 4000
+  max_train_steps: 1000
   gradient_accumulation_steps: 32
   learning_rate: 1.0e-4
   scale_lr: false
   lr_scheduler: constant
   lr_warmup_steps: 0
-  gradient_checkpointing: false
-  mixed_precision: fp16
+  gradient_checkpointing: true
+  mixed_precision: bf16
   snr_gamma: null
   prediction_type: null
   noise_offset: 0.0
   max_grad_norm: 1.0
   allow_tf32: false
-  dataloader_num_workers: 2
-  checkpointing_steps: 400
+  dataloader_num_workers: 1
+  checkpointing_steps: 200
   checkpoints_total_limit: null
   resume_from_checkpoint: null
   enable_xformers_memory_efficient_attention: false
@@ -62,21 +62,17 @@ train:
       - ff.net.2
       - ff_context.net.0.proj
       - ff_context.net.2
-  sdxl:
-    train_text_encoder: false
-    enable_npu_flash_attention: false
-    debug_loss: false
 
 validation:
   validation_prompt: a photo of abdomen CT scans image, with liver.
   num_validation_images: 4
-  validation_steps: 400
+  validation_steps: 200
 
 logging:
   report_to: swanlab
   logging_dir: logs
   project_name: 2d-gen
-  experiment_name: train_sd_lora
+  experiment_name: train_flux_lora_4gpu_1000
 
 distributed:
   find_unused_parameters: true
