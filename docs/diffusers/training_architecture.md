@@ -2,27 +2,25 @@
 
 ## Scope
 
-This document turns the pipeline summary into an implementation-oriented trainer design for:
+This is the implementation-level follow-up to `training_mapping.md`.
+
+Use it when you are designing or changing trainer code for:
 
 - Stable Diffusion
 - SDXL
 - Flux
 - QwenImage
 
-Goal:
+## Disclosure Path
 
-- keep one shared training loop
-- isolate model-specific logic in small adapters
-- avoid a single monolithic trainer full of model-specific conditionals
+1. Read `training_mapping.md` first to understand the family split.
+2. Read this doc when you need the trainer and adapter contract.
+3. Read the model-specific docs when you need family-specific behavior.
+4. Read `reference/` only to verify an upstream pattern or script detail.
 
-## Design Principle
+## Design Goal
 
-Use this split:
-
-- one `BaseDiffusionTrainer`
-- one adapter per model family
-- one shared batch schema
-- one shared optimization / checkpoint / logging path
+Keep one shared training loop, but isolate model-specific behavior in small adapters.
 
 The trainer should own:
 
@@ -86,7 +84,7 @@ Rules:
 
 ## Core Interfaces
 
-## `BaseModelAdapter`
+### `BaseModelAdapter`
 
 Each model adapter should implement a small fixed interface:
 
@@ -124,7 +122,7 @@ def apply_cfg_dropout(self, conditioning, batch, rng):
     ...
 ```
 
-## `TimeState`
+### `TimeState`
 
 Do not pass raw timestep tensors everywhere. Wrap them in a small structure.
 
@@ -139,7 +137,7 @@ class TimeState:
 
 This keeps SD-like and flow-matching-like paths under one interface.
 
-## `Conditioning`
+### `Conditioning`
 
 Use one structured object instead of many loose tensors.
 
@@ -187,9 +185,11 @@ def training_step(batch):
 
 That should be the center of the trainer design.
 
-## Stable Diffusion Adapter
+## Family-Specific Adapters
 
-## Responsibilities
+### Stable Diffusion Adapter
+
+Responsibilities:
 
 - call CLIP text encoder
 - VAE encode image latents
@@ -198,42 +198,9 @@ That should be the center of the trainer design.
 - run UNet with `encoder_hidden_states`
 - build epsilon or velocity target
 
-## Pseudocode
+### SDXL Adapter
 
-```python
-class StableDiffusionAdapter(BaseModelAdapter):
-    def encode_text(self, batch, device, dtype):
-        prompt_embeds = pipe.encode_prompt(
-            prompt=batch["prompt"],
-            device=device,
-            num_images_per_prompt=1,
-            do_classifier_free_guidance=False,
-        )[0]
-        return Conditioning(prompt_embeds=prompt_embeds)
-
-    def encode_latents(self, batch, device, dtype):
-        latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-        latents = latents * vae.config.scaling_factor
-        return latents.to(dtype)
-
-    def sample_time_state(self, latents, batch, device):
-        t = torch.randint(0, scheduler.config.num_train_timesteps, (latents.shape[0],), device=device)
-        return TimeState(timesteps=t, sigmas=None, guidance=None, extra={})
-
-    def prepare_noisy_input(self, clean_latents, time_state, noise, batch, device, dtype):
-        return scheduler.add_noise(clean_latents, noise, time_state.timesteps)
-
-    def forward_model(self, model_input, time_state, conditioning, batch):
-        return unet(
-            model_input,
-            time_state.timesteps,
-            encoder_hidden_states=conditioning.prompt_embeds,
-        )[0]
-```
-
-## SDXL Adapter
-
-## Responsibilities
+Responsibilities:
 
 - run both text encoders
 - build pooled text embeddings
@@ -242,40 +209,9 @@ class StableDiffusionAdapter(BaseModelAdapter):
 - sample timestep and noisy latent
 - run UNet with `added_cond_kwargs`
 
-## Pseudocode
+### Flux Adapter
 
-```python
-class SDXLAdapter(BaseModelAdapter):
-    def encode_text(self, batch, device, dtype):
-        prompt_embeds, _, pooled, _ = pipe.encode_prompt(
-            prompt=batch["prompt"],
-            prompt_2=batch["prompt_2"],
-            device=device,
-            num_images_per_prompt=1,
-            do_classifier_free_guidance=False,
-        )
-        add_time_ids = build_add_time_ids_from_batch(batch, pipe, prompt_embeds.dtype, device)
-        return Conditioning(
-            prompt_embeds=prompt_embeds,
-            pooled_prompt_embeds=pooled,
-            add_time_ids=add_time_ids,
-        )
-
-    def forward_model(self, model_input, time_state, conditioning, batch):
-        return unet(
-            model_input,
-            time_state.timesteps,
-            encoder_hidden_states=conditioning.prompt_embeds,
-            added_cond_kwargs={
-                "text_embeds": conditioning.pooled_prompt_embeds,
-                "time_ids": conditioning.add_time_ids,
-            },
-        )[0]
-```
-
-## Flux Adapter
-
-## Responsibilities
+Responsibilities:
 
 - get T5 token embeddings
 - get CLIP pooled embeddings
@@ -285,50 +221,9 @@ class SDXLAdapter(BaseModelAdapter):
 - sample flow-matching time state
 - run transformer with packed latent tokens
 
-## Pseudocode
+### QwenImage Adapter
 
-```python
-class FluxAdapter(BaseModelAdapter):
-    def encode_text(self, batch, device, dtype):
-        prompt_embeds, pooled, text_ids = pipe.encode_prompt(
-            prompt=batch["prompt"],
-            prompt_2=batch["prompt_2"],
-            device=device,
-            num_images_per_prompt=1,
-        )
-        return Conditioning(
-            prompt_embeds=prompt_embeds,
-            pooled_prompt_embeds=pooled,
-            text_ids=text_ids,
-        )
-
-    def encode_latents(self, batch, device, dtype):
-        latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-        latents = (latents - vae.config.shift_factor) * vae.config.scaling_factor
-        packed = pack_flux_latents(latents)
-        return packed
-
-    def sample_time_state(self, latents, batch, device):
-        ts = sample_flux_timesteps_or_sigmas(latents, scheduler, device)
-        guidance = maybe_build_guidance_tensor(latents, transformer, device)
-        img_ids = pipe._prepare_latent_image_ids(...)
-        return TimeState(timesteps=ts, sigmas=None, guidance=guidance, extra={"img_ids": img_ids})
-
-    def forward_model(self, model_input, time_state, conditioning, batch):
-        return transformer(
-            hidden_states=model_input,
-            timestep=time_state.timesteps / 1000,
-            guidance=time_state.guidance,
-            pooled_projections=conditioning.pooled_prompt_embeds,
-            encoder_hidden_states=conditioning.prompt_embeds,
-            txt_ids=conditioning.text_ids,
-            img_ids=time_state.extra["img_ids"],
-        )[0]
-```
-
-## QwenImage Adapter
-
-## Responsibilities
+Responsibilities:
 
 - apply Qwen prompt template
 - extract hidden states and prompt mask
@@ -336,44 +231,6 @@ class FluxAdapter(BaseModelAdapter):
 - build `img_shapes`
 - sample flow-matching time state
 - run transformer with prompt mask
-
-## Pseudocode
-
-```python
-class QwenImageAdapter(BaseModelAdapter):
-    def encode_text(self, batch, device, dtype):
-        prompt_embeds, prompt_mask = pipe.encode_prompt(
-            prompt=batch["prompt"],
-            device=device,
-            num_images_per_prompt=1,
-        )
-        return Conditioning(
-            prompt_embeds=prompt_embeds,
-            prompt_mask=prompt_mask,
-        )
-
-    def encode_latents(self, batch, device, dtype):
-        latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-        latents = normalize_qwen_latents(latents, vae)
-        packed = pack_qwen_latents(latents)
-        return packed
-
-    def sample_time_state(self, latents, batch, device):
-        ts = sample_qwen_timesteps_or_sigmas(latents, scheduler, device)
-        guidance = maybe_build_guidance_tensor(latents, transformer, device)
-        img_shapes = build_img_shapes_from_batch(batch, vae_scale_factor)
-        return TimeState(timesteps=ts, sigmas=None, guidance=guidance, extra={"img_shapes": img_shapes})
-
-    def forward_model(self, model_input, time_state, conditioning, batch):
-        return transformer(
-            hidden_states=model_input,
-            timestep=time_state.timesteps / 1000,
-            guidance=time_state.guidance,
-            encoder_hidden_states=conditioning.prompt_embeds,
-            encoder_hidden_states_mask=conditioning.prompt_mask,
-            img_shapes=time_state.extra["img_shapes"],
-        )[0]
-```
 
 ## CFG Training Strategy
 
@@ -388,7 +245,7 @@ Recommended training-time approach:
 Why:
 
 - SD/SDXL null conditioning and Flux/QwenImage negative branch handling are not identical
-- the trainer should not know how "empty conditioning" is represented for each model
+- the trainer should not know how empty conditioning is represented for each model
 
 ## Loss Interface
 
