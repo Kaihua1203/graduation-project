@@ -55,12 +55,19 @@ Read in order:
 ## diffusers Generation Model Training Docs Progressive Disclosure
 Scope in this repo:
 - use these docs when analyzing or implementing training code for diffusion / generation models based on diffusers pipelines.
-- start from the cross-model training docs first, then drill down into model-specific pipeline docs only when needed.
 - diffusers repo: `/home/jupyter-wenkaihua/data3_link/kaihua.wen/code/diffusers`
 
-Read in order:
-1. `docs/diffusers/training_mapping.md`
-2. `docs/diffusers/training_architecture.md`
+Disclosure path:
+1. `docs/diffusers/README.md` for the entry point and reading strategy.
+2. `docs/diffusers/training_mapping.md` for the cross-model mental model and family split.
+3. `docs/diffusers/training_architecture.md` for the trainer and adapter contract.
+4. `docs/diffusers/stable_diffusion.md`, `docs/diffusers/stable_diffusion_3.md`, `docs/diffusers/sdxl.md`, `docs/diffusers/flux.md`, `docs/diffusers/qwenimage.md` for family-specific behavior.
+5. `docs/diffusers/reference/` for upstream scripts and implementation details.
+
+Use these docs as a narrowing path, not as a mandatory fixed reading order:
+- start at the highest-level doc that can answer the question
+- drill down only when you need the next layer of detail
+- stop at the first layer that gives enough context to make a correct change
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the read tool (use offset + limit for ranged reads).
