@@ -20,8 +20,19 @@ Read `ARCHITECTURE.md` for the current repository layout and module map.
 
 ## Commit & Pull Request Guidelines
 - Use conventional commits with short, imperative subjects:
-  - Examples: `feat: add vicreg config for lits`, `fix: handle empty lits directory`.
-- When Codex makes functional changes (e.g., adding/removing evaluation pipeline pieces, training algorithms, or other behavior changes), or performs substantial multi-file/code-volume edits, launch a `reviewer` agent to review code. Then create one commit for that work and push it in the github.
+  - Prefer the format: `<type>(codex): <short imperative summary>`.
+  - Include `Codex` attribution in the commit body when a body is used.
+  - Examples: `feat(codex): add vicreg config for lits`, `fix(codex): handle empty lits directory`, `docs(codex): clarify agent workflow`.
+- When Codex completes any meaningful `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, or similar change, it should create a dedicated commit for that unit of work after verification. Push when the work is ready for delivery, review, or handoff; do not leave completed Codex work uncommitted without a clear reason.
+- Never include unrelated local changes in a Codex commit. Stage and commit only the files that belong to the current Codex task.
+- For substantial or higher-risk Codex tasks, default to spawning three sub-agents to reduce main-session context pressure and separate responsibilities. For small or clearly bounded tasks, the main agent may simplify this workflow when doing so is more efficient:
+  - `reviewer`: review the produced changes for bugs, regressions, missing edge cases, and documentation gaps.
+  - `tester`: add or update relevant tests, run the validation commands, and report the exact commands and outcomes.
+  - `git agent`: handle staging only the Codex-owned files for this session, create the commit, push the branch, and prepare the PR content.
+- The main agent remains responsible for final technical decisions, integrating feedback from the three sub-agents, and ensuring their outputs are consistent before commit and push.
+- Codex may commit directly for small, low-risk, self-contained changes that do not materially change behavior, such as docs, comments, formatting, typo fixes, or narrowly scoped housekeeping edits, if the repository workflow allows it.
+- Codex should prefer a PR for behavior changes, multi-file refactors, new features, non-trivial bug fixes, changes to training or evaluation logic, changes that affect public interfaces or configs, or any work that benefits from explicit review and traceability.
+- If it is unclear whether direct commit or PR is more appropriate, prefer opening a PR.
 - PRs should include:
   - A concise summary of changes and rationale.
   - Links to related issues (if any).
@@ -85,7 +96,7 @@ git status
 git add 
 
 # 3. Commit
-git commit -m "fix: description"
+git commit -m "fix(codex): description"
 
 # 4. Push (pull --rebase if needed, but NEVER reset/checkout)
 git pull --rebase && git push
