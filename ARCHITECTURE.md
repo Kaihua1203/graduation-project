@@ -99,13 +99,24 @@ graduation-project/
 │   ├── train/
 │   │   ├── train_sd_lora.yaml
 │   │   ├── train_sd_lora_example.yaml
-│   │   └── ...
+│   │   ├── train_sd15_dreambooth_example.yaml
+│   │   ├── train_sd3_lora.yaml
+│   │   ├── train_sd3_lora_example.yaml
+│   │   ├── train_sdxl_lora.yaml
+│   │   ├── train_sdxl_lora_example.yaml
+│   │   ├── train_flux_lora.yaml
+│   │   ├── train_flux_lora_example.yaml
+│   │   ├── train_qwenimage_lora.yaml
+│   │   └── train_qwenimage_lora_example.yaml
 │   ├── infer/
 │   │   ├── infer_sd_example.yaml
-│   │   └── ...
+│   │   ├── infer_sd_lora.yaml
+│   │   ├── infer_sd3_lora.yaml
+│   │   └── infer_flux_lora.yaml
 │   └── eval/
 │       ├── eval_example.yaml
-│       └── ...
+│       ├── eval_sd_lora.yaml
+│       └── eval_flux_lora.yaml
 ├── scripts/
 │   ├── run_with_venv.sh
 │   ├── run_train.sh
@@ -134,6 +145,7 @@ graduation-project/
 - `src/train/`
   - `run_train.py`: CLI entry point for generation training.
   - `base_trainer.py`: Shared training loop, dataloader construction, checkpoint writing, and loss summary output.
+  - `run_dreambooth_sd15.py`: Standalone SD1.5 DreamBooth LoRA trainer.
   - `adapters/`: Model-family-specific integration layer.
     - `base.py`: Adapter interface and validation hooks.
     - `stable_diffusion.py`: Implemented Stable Diffusion LoRA training path.
@@ -152,6 +164,7 @@ graduation-project/
 - `configs/`
   - YAML examples grouped under `train/`, `infer/`, and `eval/`.
   - `train/train_sd_lora.yaml` is the current concrete Stable Diffusion LoRA training config.
+  - `train/train_sd15_dreambooth_example.yaml` covers the standalone DreamBooth path.
 
 - `scripts/`
   - Thin shell wrappers that activate the selected venv and launch train/infer/eval or manifest-building workflows.

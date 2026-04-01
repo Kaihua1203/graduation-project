@@ -1,11 +1,13 @@
 # Changelog
 
-This file summarizes what Codex changed in `2d-gen` before the planned refactor on 2026-03-28.
+This file summarizes `2d-gen` changes that have landed on `main`.
 
 ## Current Snapshot
 
 - Project path: `2d-gen/`
 - Current focus implemented in repo: `Stable Diffusion` LoRA baseline, shared train/infer/eval scaffold, local-weight-only evaluation, and manifest generation from `images/` + `prompts/`
+- Current config layout: `configs/train/`, `configs/infer/`, and `configs/eval/`
+- Current output layout: `outputs/train/`, `outputs/infer/`, and `outputs/eval/`
 - Current helper scripts:
   - `scripts/run_train.sh`
   - `scripts/run_infer.sh`
@@ -13,6 +15,42 @@ This file summarizes what Codex changed in `2d-gen` before the planned refactor 
   - `scripts/run_build_manifest.sh`
 
 ## Commit History
+
+### `7979a75` `docs: update eval usage and config defaults`
+
+Updated eval-facing docs and shipped configs to match the new runtime behavior.
+
+- Updated [README.md](/data3/kaihua.wen/code/graduation-project/2d-gen/README.md)
+  - documented timestamped eval outputs
+  - documented `eval.real_inception_cache_dir`
+  - documented that `eval.num_workers` now affects eval-side loading
+- Updated [configs/README.md](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/README.md)
+  - clarified that `eval.output_path` is a base filename and the actual metrics file is timestamped
+- Updated shipped eval presets:
+  - [eval/eval_example.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/eval/eval_example.yaml)
+  - [eval/eval_sd_lora.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/eval/eval_sd_lora.yaml)
+  - defaulted `num_workers` to `4`
+  - added `real_inception_cache_dir`
+
+### `73db7ab` `feat: speed up generation eval`
+
+Refactored generation evaluation for equivalent-but-faster execution and expanded eval outputs.
+
+- Updated [metrics.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/eval/metrics.py)
+  - reused generated-image Inception extraction across `FID` and `IS`
+  - added real-image Inception disk caching
+  - switched `CLIP-I` and `CLIP-T` to batched execution
+  - wired `num_workers` into eval-side DataLoaders
+  - kept final metrics rounded to two decimals
+- Updated [types.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/types.py)
+  - changed eval result schema from scalar `clip_i` / `clip_t` to `clip_i_mean/std` and `clip_t_mean/std`
+- Updated [run_evaluate.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/eval/run_evaluate.py)
+  - passed through `num_workers`
+  - passed through `real_inception_cache_dir`
+  - wrote timestamped metrics output files to avoid overwriting previous runs
+- Expanded eval regression coverage in:
+  - [test_metrics_smoke.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_metrics_smoke.py)
+  - [test_run_evaluate.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_run_evaluate.py)
 
 ### `041ada5` `feat: add 2d-gen manifest builder`
 
@@ -27,6 +65,158 @@ Added a manifest-generation flow for training data.
 - Added [run_build_manifest.sh](/data3/kaihua.wen/code/graduation-project/2d-gen/scripts/run_build_manifest.sh)
 - Added [test_manifest_builder.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_manifest_builder.py)
 - Updated [README.md](/data3/kaihua.wen/code/graduation-project/2d-gen/README.md) with manifest-builder usage
+
+### `eb274a1` `feat: add 2d-gen sd lora bootstrap assets`
+
+Added SD LoRA bootstrap references and seed config assets.
+
+- Updated [train/train_sd_lora.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/train/train_sd_lora.yaml)
+- Added diffusers reference docs used during bootstrap under `docs/diffusers/reference/`
+- Updated [CHANGELOG.md](/data3/kaihua.wen/code/graduation-project/2d-gen/CHANGELOG.md)
+
+### `473df8b` `feat: align 2d-gen training config schema`
+
+Aligned train entrypoint and config schema with nested sections.
+
+- Updated [config.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/config.py)
+- Updated [run_train.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/run_train.py)
+- Updated [run_train.sh](/data3/kaihua.wen/code/graduation-project/2d-gen/scripts/run_train.sh)
+- Updated training examples and docs in `2d-gen/configs/`
+- Updated schema tests in [test_config_and_dataset.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_config_and_dataset.py)
+
+### `eaa9d5a` `feat: refactor 2d-gen training runtime`
+
+Refactored shared training runtime and adapter interface foundations.
+
+- Updated [base.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/base.py)
+- Updated [stable_diffusion.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/stable_diffusion.py)
+- Updated [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py)
+
+### `06ec224` `fix: harden 2d-gen training refactor runtime`
+
+Hardened runtime behavior and adapter validation after refactor.
+
+- Strengthened config/data/runtime checks in:
+  - [config.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/config.py)
+  - [dataset.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/data/dataset.py)
+  - [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py)
+- Updated adapter behavior for `sdxl` / `flux` / `qwenimage`
+- Expanded tests in:
+  - [test_config_and_dataset.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_config_and_dataset.py)
+  - [test_adapter_validators.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_adapter_validators.py)
+
+### `32c5aa0` `fix: drop fake distributed config and step resume`
+
+Removed fake distributed knobs and fixed step resume logic.
+
+- Updated train configs and docs in `2d-gen/configs/`
+- Updated [config.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/config.py)
+- Updated [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py)
+- Updated [test_config_and_dataset.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_config_and_dataset.py)
+
+### `ab5ec8e` `fix: clean train logging and launch validation`
+
+Unified training logging semantics and launcher validation.
+
+- Updated launcher guardrails in [run_train.sh](/data3/kaihua.wen/code/graduation-project/2d-gen/scripts/run_train.sh)
+- Cleaned logging fields in:
+  - [config.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/config.py)
+  - [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py)
+  - `2d-gen/configs/train/train_sd_lora*.yaml`
+- Added smoke coverage in [test_train_logging_and_launch.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_train_logging_and_launch.py)
+
+### `0222856` `fix: support directory prompt inference`
+
+Added directory-based batch prompt inference with deterministic ordering.
+
+- Updated [generator.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/infer/generator.py)
+- Updated infer docs/example config under `2d-gen/configs/`
+- Added [test_infer_generator.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_infer_generator.py)
+
+### `526a089` `feat: implement sdxl flux and qwen adapters`
+
+Implemented training adapters for `SDXL`, `Flux`, and `Qwen Image`.
+
+- Updated adapter implementations:
+  - [sdxl.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/sdxl.py)
+  - [flux.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/flux.py)
+  - [qwenimage.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/qwenimage.py)
+- Added/updated adapter regression coverage:
+  - [test_adapter_validators.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_adapter_validators.py)
+  - [test_adapter_family_smoke.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_adapter_family_smoke.py)
+
+### `6dc153b` `feat: add sd15 dreambooth trainer`
+
+Added standalone SD1.5 DreamBooth LoRA training path.
+
+- Added trainer entrypoint [run_dreambooth_sd15.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/run_dreambooth_sd15.py)
+- Added launcher [run_dreambooth_sd15.sh](/data3/kaihua.wen/code/graduation-project/2d-gen/scripts/run_dreambooth_sd15.sh)
+- Added example config [train/train_sd15_dreambooth_example.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/train/train_sd15_dreambooth_example.yaml)
+- Added smoke test [test_dreambooth_sd15_smoke.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_dreambooth_sd15_smoke.py)
+- Updated docs in [README.md](/data3/kaihua.wen/code/graduation-project/2d-gen/README.md) and [configs/README.md](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/README.md)
+
+### `e6604c7` `feat: add liver lora training configs and docs reference`
+
+Added liver/liver-tumor training presets and references.
+
+- Added [train/train_sd_lora_liver.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/train/train_sd_lora_liver.yaml)
+- Added [train/train_sd_lora_liver_tumor.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/train/train_sd_lora_liver_tumor.yaml)
+- Added diffusers reference file under `docs/diffusers/reference/`
+
+### `5a7d834` `fix: align trainer step accounting and config cleanup`
+
+Aligned train-step accounting with `max_train_steps` and cleaned stale config checks.
+
+- Updated [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py) to derive epochs from target steps
+- Removed legacy schema reject checks in [config.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/config.py)
+- Removed DreamBooth swanlab `prompt` image-log field in [run_dreambooth_sd15.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/run_dreambooth_sd15.py)
+- Updated tests in:
+  - [test_config_and_dataset.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_config_and_dataset.py)
+  - [test_train_logging_and_launch.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_train_logging_and_launch.py)
+  - [test_dreambooth_sd15_smoke.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_dreambooth_sd15_smoke.py)
+
+### `b450bf5` `fix: guard empty train dataloader`
+
+Added explicit empty-dataloader guard and synced docs.
+
+- Added guard in [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py)
+- Added coverage in [test_train_logging_and_launch.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_train_logging_and_launch.py)
+- Updated [configs/README.md](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/README.md)
+
+### `638bdbe` `merge: integrate 2d-gen updates`
+
+Merged integration branch into `main` and resolved `train/train_sd_lora.yaml` conflict.
+
+- Resolved and updated [train/train_sd_lora.yaml](/data3/kaihua.wen/code/graduation-project/2d-gen/configs/train/train_sd_lora.yaml)
+
+### `3d89e90` `fix: switch validation schedule to steps`
+
+Switched validation cadence from epoch-based to step-based scheduling.
+
+- Replaced `validation.validation_epochs` with `validation.validation_steps` across:
+  - [config.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/common/config.py)
+  - [base_trainer.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/base_trainer.py)
+  - [run_dreambooth_sd15.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/run_dreambooth_sd15.py)
+  - README/config docs and train config examples
+- Added explicit rejection for legacy `validation_epochs` key in both train config loaders
+- Expanded tests:
+  - [test_config_and_dataset.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_config_and_dataset.py)
+  - [test_train_logging_and_launch.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_train_logging_and_launch.py)
+  - [test_dreambooth_sd15_smoke.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_dreambooth_sd15_smoke.py)
+  - [test_adapter_family_smoke.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_adapter_family_smoke.py)
+
+### `2a122fb` `fix: make sdxl add_time_ids compatible with DDP`
+
+Fixed SDXL `add_time_ids` behavior under distributed data parallel.
+
+- Updated [sdxl.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/sdxl.py)
+
+### `4951a55` `fix: handle flux guidance under ddp`
+
+Fixed Flux guidance handling under distributed data parallel and updated validator coverage.
+
+- Updated [flux.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/train/adapters/flux.py)
+- Updated [test_adapter_validators.py](/data3/kaihua.wen/code/graduation-project/2d-gen/src/tests/test_adapter_validators.py)
 
 ### `f5df872` `chore: align 2d-gen env defaults with diffusers venv`
 
