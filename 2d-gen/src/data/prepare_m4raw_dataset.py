@@ -23,6 +23,7 @@ DEFAULT_SOURCE_ROOT = Path("/NAS_data/M4RawV1.6/multicoil_train")
 DEFAULT_OUTPUT_ROOT = Path("/home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4raw/train")
 DEFAULT_IMAGE_SIZE = 512
 EXPECTED_FILES_PER_MODALITY = 128
+OUTPUT_MODALITIES = tuple(sorted(set(SOURCE_MODALITY_TO_OUTPUT.values())))
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,8 +95,8 @@ def validate_selected_files(selected_files: list[Path], expected_files_per_modal
         )
 
 
-def reset_output_root(output_root: Path) -> None:
-    for modality in sorted(set(SOURCE_MODALITY_TO_OUTPUT.values())):
+def reset_output_root(output_root: Path, output_modalities: tuple[str, ...] = OUTPUT_MODALITIES) -> None:
+    for modality in output_modalities:
         modality_root = output_root / modality
         if modality_root.exists():
             shutil.rmtree(modality_root)
@@ -131,9 +132,9 @@ def process_file(
     return written_count
 
 
-def build_manifests(output_root: Path) -> list[Path]:
+def build_manifests(output_root: Path, output_modalities: tuple[str, ...] = OUTPUT_MODALITIES) -> list[Path]:
     manifest_paths: list[Path] = []
-    for modality in sorted(set(SOURCE_MODALITY_TO_OUTPUT.values())):
+    for modality in output_modalities:
         images_dir, prompts_dir = get_output_directories(output_root, modality)
         if not any(images_dir.iterdir()):
             continue

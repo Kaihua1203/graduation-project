@@ -154,6 +154,16 @@ bash scripts/run_prepare_m4raw.sh \
 
 This script reconstructs each slice with `ifft2c -> complex_abs -> rss`, normalizes each slice to `0-255`, resizes to `512x512`, writes grayscale PNGs under `<output_root>/<modality>/images`, writes matching prompts under `<output_root>/<modality>/prompts`, and generates `train_T1.jsonl`, `train_T2.jsonl`, and `train_FLAIR.jsonl`.
 
+Prepare the multi-repetition averaged M4Raw dataset by averaging `reconstruction_rss` across `T101/T102/T103`, `T201/T202/T203`, and `FLAIR01/FLAIR02` before writing slices:
+
+```bash
+bash scripts/run_prepare_m4raw_average.sh \
+  --source-root /NAS_data/M4RawV1.6/multicoil_train \
+  --output-root /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average
+```
+
+This averaged variant follows the M4Raw tutorial repetition example: it reads each repetition file's `reconstruction_rss`, computes the per-slice arithmetic mean within each modality group, normalizes each averaged slice to `0-255`, resizes to `512x512`, writes grayscale PNGs under `<output_root>/<modality>/images`, writes matching prompts under `<output_root>/<modality>/prompts`, and generates `train_T1.jsonl`, `train_T2.jsonl`, and `train_FLAIR.jsonl`.
+
 Evaluation notes:
 
 - `bash scripts/run_eval.sh <config.yaml>` writes a timestamped metrics file based on `eval.output_path`, for example `metrics_20260331_123456.json`, so repeated runs do not overwrite each other.
