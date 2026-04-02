@@ -68,7 +68,7 @@ train:
     debug_loss: false
 
 validation:
-  validation_prompt: a photo of abdomen CT scans image, with liver.
+  validation_prompt: a FLAIR brain MRI slice at slice position 7, acquired with a low-field 0.3T scanner
   num_validation_images: 4
   validation_steps: 400
 
