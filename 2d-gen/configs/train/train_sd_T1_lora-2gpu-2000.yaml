@@ -1,6 +1,6 @@
 model:
-  family: stable_diffusion_3
-  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-3-medium
+  family: stable_diffusion
+  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-v1-5
   pretrained_vae_model_name_or_path: null
   revision: null
   variant: null
@@ -17,7 +17,7 @@ data:
   max_train_samples: null
 
 train:
-  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd3_T1_lora-2gpu-2000
+  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd_T1_lora-2gpu-2000
   seed: 3407
   train_batch_size: 1
   num_train_epochs: 10
@@ -76,7 +76,7 @@ logging:
   report_to: swanlab
   logging_dir: logs
   project_name: 2d-gen
-  experiment_name: train_sd3_T1_lora-2gpu-2000
+  experiment_name: train_sd_T1_lora-2gpu-2000
 
 distributed:
   find_unused_parameters: true

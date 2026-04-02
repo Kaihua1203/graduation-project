@@ -17,7 +17,7 @@ data:
   max_train_samples: null
 
 train:
-  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd3_lora
+  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd3_T2_lora-2gpu-2000
   seed: 3407
   train_batch_size: 1
   num_train_epochs: 10

@@ -1,13 +1,13 @@
 model:
-  family: stable_diffusion_3
-  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-3-medium
+  family: stable_diffusion
+  pretrained_model_name_or_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-v1-5
   pretrained_vae_model_name_or_path: null
   revision: null
   variant: null
   local_files_only: true
 
 data:
-  train_manifest: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/train_T1.jsonl
+  train_manifest: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/train_FLAIR.jsonl
   image_column: image_path
   caption_column: prompt
   resolution: 512
@@ -17,7 +17,7 @@ data:
   max_train_samples: null
 
 train:
-  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd3_T1_lora-2gpu-2000
+  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd_FLAIR_lora-2gpu-2000
   seed: 3407
   train_batch_size: 1
   num_train_epochs: 10
@@ -68,7 +68,7 @@ train:
     debug_loss: false
 
 validation:
-  validation_prompt: a T1 brain MRI slice at slice position 7, acquired with a low-field 0.3T scanner.
+  validation_prompt: a FLAIR brain MRI slice at slice position 7, acquired with a low-field 0.3T scanner
   num_validation_images: 4
   validation_steps: 400
 
@@ -76,7 +76,7 @@ logging:
   report_to: swanlab
   logging_dir: logs
   project_name: 2d-gen
-  experiment_name: train_sd3_T1_lora-2gpu-2000
+  experiment_name: train_sd_FLAIR_lora-2gpu-2000
 
 distributed:
   find_unused_parameters: true
