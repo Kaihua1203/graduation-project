@@ -13,6 +13,7 @@ from data.prepare_m4raw_average_dataset import (
     AVERAGED_MODALITY_GROUPS,
     average_reconstruction_rss,
     group_case_files,
+    parse_args,
     process_case_group,
     validate_grouped_files,
 )
@@ -127,6 +128,18 @@ class PrepareM4RawAverageDatasetTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Unexpected averaged file groups"):
             validate_grouped_files(grouped_files, expected_cases_per_modality=2)
+
+    def test_parse_args_supports_skip_manifests_flag(self) -> None:
+        import sys
+
+        argv = sys.argv
+        try:
+            sys.argv = ["prepare_m4raw_average_dataset.py", "--skip-manifests"]
+            args = parse_args()
+        finally:
+            sys.argv = argv
+
+        self.assertTrue(args.skip_manifests)
 
 
 if __name__ == "__main__":

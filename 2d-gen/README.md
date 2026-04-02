@@ -164,6 +164,15 @@ bash scripts/run_prepare_m4raw_average.sh \
 
 This averaged variant follows the M4Raw tutorial repetition example: it reads each repetition file's `reconstruction_rss`, computes the per-slice arithmetic mean within each modality group, normalizes each averaged slice to `0-255`, resizes to `512x512`, writes grayscale PNGs under `<output_root>/<modality>/images`, writes matching prompts under `<output_root>/<modality>/prompts`, and generates `train_T1.jsonl`, `train_T2.jsonl`, and `train_FLAIR.jsonl`.
 
+For test-only exports that should keep the same averaged image/prompt layout but skip manifest generation, add `--skip-manifests` and point to the validation split/output root:
+
+```bash
+bash scripts/run_prepare_m4raw_average.sh \
+  --source-root /NAS_data/M4RawV1.6/multicoil_val \
+  --output-root /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/test \
+  --skip-manifests
+```
+
 Evaluation notes:
 
 - `bash scripts/run_eval.sh <config.yaml>` writes a timestamped metrics file based on `eval.output_path`, for example `metrics_20260331_123456.json`, so repeated runs do not overwrite each other.

@@ -37,6 +37,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-size", type=int, default=DEFAULT_IMAGE_SIZE)
     parser.add_argument("--slice-index-start", type=int, default=0)
     parser.add_argument("--expected-cases-per-modality", type=int, default=EXPECTED_CASES_PER_MODALITY)
+    parser.add_argument(
+        "--skip-manifests",
+        action="store_true",
+        help="Skip writing train_<modality>.jsonl files. Useful for test-only dataset exports.",
+    )
     return parser.parse_args()
 
 
@@ -155,9 +160,12 @@ def main() -> None:
                 slice_index_start=args.slice_index_start,
             )
 
-    manifest_paths = build_manifests(output_root, OUTPUT_MODALITIES)
-
     print(f"Processed {total_cases} averaged case groups into {total_slices} PNG/TXT pairs under {output_root}")
+    if args.skip_manifests:
+        print("Skipped manifest generation")
+        return
+
+    manifest_paths = build_manifests(output_root, OUTPUT_MODALITIES)
     for manifest_path in manifest_paths:
         print(f"Wrote manifest to {manifest_path}")
 
