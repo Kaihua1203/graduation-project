@@ -144,6 +144,16 @@ bash scripts/run_build_manifest.sh \
 The builder matches files by the same stem, for example `images/0001.png` with `prompts/0001.txt`.
 It only scans the first directory level and writes absolute `image_path` entries into the JSONL.
 
+Prepare the selected M4Raw modalities (`T101`, `T201`, `FLAIR01`) into per-slice grayscale PNGs, prompt `.txt` files, and modality-specific manifests:
+
+```bash
+bash scripts/run_prepare_m4raw.sh \
+  --source-root /NAS_data/M4RawV1.6/multicoil_train \
+  --output-root /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4raw/train
+```
+
+This script reconstructs each slice with `ifft2c -> complex_abs -> rss`, normalizes each slice to `0-255`, resizes to `512x512`, writes grayscale PNGs under `<output_root>/<modality>/images`, writes matching prompts under `<output_root>/<modality>/prompts`, and generates `train_T1.jsonl`, `train_T2.jsonl`, and `train_FLAIR.jsonl`.
+
 Evaluation notes:
 
 - `bash scripts/run_eval.sh <config.yaml>` writes a timestamped metrics file based on `eval.output_path`, for example `metrics_20260331_123456.json`, so repeated runs do not overwrite each other.
