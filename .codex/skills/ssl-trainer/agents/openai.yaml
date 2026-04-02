@@ -1,4 +1,0 @@
-interface:
-  display_name: "SSL Trainer"
-  short_description: "Schedule GPU SSL pretraining jobs from model and config"
-  default_prompt: "Use this skill to launch SSL pretraining jobs on available GPUs with a provided model/config and verify they started successfully."
