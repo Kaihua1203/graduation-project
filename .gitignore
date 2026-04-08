@@ -24,3 +24,4 @@ lightning_logs/
 .pytest_cache
 MEMORY.md
 PLANS.md
+.understand-anything/
