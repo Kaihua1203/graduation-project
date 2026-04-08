@@ -52,6 +52,7 @@ if [ -n "$gpu_ids_csv" ]; then
     exec accelerate launch \
       --multi_gpu \
       --num_processes "$num_processes" \
+      --main_process_port 0 \
       "$SCRIPT_DIR/../src/infer/generator.py" \
       --config "$CONFIG_PATH" \
       "${extra_args[@]}"
