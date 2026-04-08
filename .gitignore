@@ -22,3 +22,5 @@ lightning_logs/
 .codex
 2d-gen/tasks/
 .pytest_cache
+MEMORY.md
+PLANS.md

@@ -5,7 +5,7 @@ Read `ARCHITECTURE.md` for the current repository layout and module map.
 
 ## Project Environment Rules
 - Before starting implementation work, first align with the user on which project environment or `venv` should be used. Do not assume the environment if the user has not specified it.
-- When working in the `2d-gen` repository, use the virtual environment located at `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers`.
+- When working in the `2d-gen` repository, use the virtual environment located at `/home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers` by default.
 
 ## Coding Style & Naming Conventions
 - Python code uses 4-space indentation and standard PEP 8 naming.
