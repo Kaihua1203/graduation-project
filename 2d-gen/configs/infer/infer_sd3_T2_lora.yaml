@@ -1,0 +1,15 @@
+model:
+  family: stable_diffusion_3
+  pretrained_path:  /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-3-medium
+  lora_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/sd3_T2_lora-2gpu-2000/checkpoints/final_lora
+  local_files_only: true
+
+infer:
+  prompts_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/test/T2/prompts # or /abs/path/to/prompt_dir
+  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/infer/sd3_T2_lora-2gpu-2000_infer
+  gpu_ids: [3,4,5]
+  num_inference_steps: 28
+  guidance_scale: 7.0
+  height: 512
+  width: 512
+  seed: 3407

@@ -1,0 +1,10 @@
+eval:
+  real_image_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/test/FLAIR/imagesTs
+  generated_image_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/infer/flux_FLAIR_lora-2gpu-2000_infer
+  generated_manifest: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/infer/flux_FLAIR_lora-2gpu-2000_infer/metadata.jsonl
+  output_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/eval_flux_FLAIR_lora-2gpu-2000/metrics.json
+  batch_size: 8
+  num_workers: 4
+  real_inception_cache_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/cache_flair
+  inception_weights_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/inception_v3/inception_v3_google-0cc3c7bd.pth
+  clip_model_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/clip-vit-base-patch32

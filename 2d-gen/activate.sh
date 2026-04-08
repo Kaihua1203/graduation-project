@@ -1,0 +1,1 @@
+source /home/jupyter-wenkaihua/data3_link/kaihua.wen/venv/diffusers/bin/activate
