@@ -13,6 +13,25 @@ CONFIG_PATH="${1:?usage: bash scripts/run_infer.sh <config.yaml> [--resume]}"
 shift
 extra_args=("$@")
 
+infer_entrypoint="$(
+  python - "$CONFIG_PATH" <<'PY'
+import sys
+from pathlib import Path
+
+import yaml
+
+config_path = Path(sys.argv[1]).expanduser().resolve()
+with config_path.open("r", encoding="utf-8") as handle:
+    config = yaml.safe_load(handle) or {}
+
+model_config = config.get("model") or {}
+if "export_bundle_path" in model_config:
+    print("run_infer_uncond_ldm.py")
+else:
+    print("generator.py")
+PY
+)"
+
 gpu_ids_csv="$(
   python - "$CONFIG_PATH" <<'PY'
 import sys
@@ -53,10 +72,10 @@ if [ -n "$gpu_ids_csv" ]; then
       --multi_gpu \
       --num_processes "$num_processes" \
       --main_process_port 0 \
-      "$SCRIPT_DIR/../src/infer/generator.py" \
+      "$SCRIPT_DIR/../src/infer/$infer_entrypoint" \
       --config "$CONFIG_PATH" \
       "${extra_args[@]}"
   fi
 fi
 
-exec python "$SCRIPT_DIR/../src/infer/generator.py" --config "$CONFIG_PATH" "${extra_args[@]}"
+exec python "$SCRIPT_DIR/../src/infer/$infer_entrypoint" --config "$CONFIG_PATH" "${extra_args[@]}"
