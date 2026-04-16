@@ -396,6 +396,12 @@ Yes, this work can be split across three worktrees cleanly. In fact, that is a g
 
 Recommended split:
 
+Each implementation worktree must also have its own dedicated review and test coverage. Do not treat review and testing as one shared global phase for the whole project. For every worktree below, assign:
+
+- one implementation owner
+- one reviewer agent
+- one tester agent
+
 ### Worktree 1: Training
 
 Ownership:
@@ -412,6 +418,8 @@ Responsibilities:
 - image-only dataset path
 - unconditional latent diffusion training loop
 - checkpointing integration on the training side
+- training-specific code review for bugs, regressions, and interface drift
+- training-specific validation and test execution
 
 ### Worktree 2: Inference
 
@@ -427,6 +435,8 @@ Responsibilities:
 - unconditional generation helper
 - final export/load contract
 - reference-filename-aligned sample generation
+- inference-specific code review for sampling correctness and export compatibility
+- inference-specific validation and test execution
 
 ### Worktree 3: Evaluation
 
@@ -442,6 +452,8 @@ Responsibilities:
 - image-only metric orchestration
 - removal of prompt-dependent metrics
 - directory and filename consistency validation
+- evaluation-specific code review for metric correctness and failure modes
+- evaluation-specific validation and test execution
 
 ### Shared Interface Rules
 
@@ -453,6 +465,20 @@ To keep the worktrees independent:
 - avoid shared mutable edits to the existing text-conditioned adapter stack
 
 The main coordination point is the exported model bundle contract. That contract should be fixed before parallel implementation starts.
+
+### Required Agent Composition
+
+If the project is executed with three parallel worktrees, the minimum recommended staffing is:
+
+- `train` worktree: 1 implementation agent, 1 reviewer agent, 1 tester agent
+- `infer` worktree: 1 implementation agent, 1 reviewer agent, 1 tester agent
+- `eval` worktree: 1 implementation agent, 1 reviewer agent, 1 tester agent
+
+The main coordinating session remains responsible for:
+
+- fixing the shared export contract before parallel work begins
+- integrating cross-worktree decisions
+- checking that reviewer and tester outputs are consistent with the final merged state
 
 ## Recommended Implementation Order
 
