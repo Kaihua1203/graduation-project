@@ -71,6 +71,7 @@ Disclosure path:
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the read tool (use offset + limit for ranged reads).
 - You MUST read every file you modify in full before editing.
+- When waiting on long-running tasks, use exponential backoff for status checks with increasing intervals (1 minute, 2 minutes, 4 minutes, 8 minutes, ...) instead of tight polling.
 
 ## **CRITICAL** Git Rules for Parallel Agents **CRITICAL**
 
