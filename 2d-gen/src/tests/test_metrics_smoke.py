@@ -10,6 +10,7 @@ import torch
 from PIL import Image
 
 from eval.metrics import (
+    _build_biomedclip_cache_path,
     _build_inception_cache_path,
     _load_manifest_records,
     evaluate_generation_quality,
@@ -64,10 +65,27 @@ class MetricsSmokeTest(unittest.TestCase):
             second_cache_path = _build_inception_cache_path([image_path], weights_path, cache_dir)
             self.assertNotEqual(first_cache_path, second_cache_path)
 
+    def test_build_biomedclip_cache_path_changes_when_source_file_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            image_path = tmpdir_path / "sample.png"
+            model_path = tmpdir_path / "biomedclip"
+            cache_dir = tmpdir_path / "cache"
+            Image.new("RGB", (16, 16), color=(255, 0, 0)).save(image_path)
+            model_path.mkdir()
+            (model_path / "open_clip_config.json").write_text("{}", encoding="utf-8")
+            (model_path / "open_clip_pytorch_model.bin").write_bytes(b"weights")
+            first_cache_path = _build_biomedclip_cache_path([image_path], model_path, cache_dir)
+            image_path.write_bytes(image_path.read_bytes() + b"changed")
+            second_cache_path = _build_biomedclip_cache_path([image_path], model_path, cache_dir)
+            self.assertNotEqual(first_cache_path, second_cache_path)
+
     def test_evaluate_generation_quality_returns_expected_metric_fields(self) -> None:
         real_features = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)
         generated_features = np.array([[5.0, 6.0], [7.0, 8.0]], dtype=np.float64)
         generated_probs = np.array([[0.2, 0.8], [0.4, 0.6]], dtype=np.float64)
+        real_biomedclip_features = np.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float64)
+        generated_biomedclip_features = np.array([[0.5, 0.6], [0.7, 0.8]], dtype=np.float64)
         with (
             patch("eval.metrics._load_inception_backbone", return_value=(MagicMock(), torch.device("cpu"))),
             patch(
@@ -77,10 +95,20 @@ class MetricsSmokeTest(unittest.TestCase):
                     (generated_features, generated_probs),
                 ],
             ) as mock_inception,
-            patch("eval.metrics.compute_fid", return_value=12.345),
+            patch("eval.metrics.compute_fid", side_effect=[12.345, 45.678]),
             patch("eval.metrics.compute_inception_score", return_value=(1.234, 0.567)),
             patch("eval.metrics.compute_clip_i", return_value=(0.876, 0.123)),
             patch("eval.metrics.compute_clip_t", return_value=(0.765, 0.234)),
+            patch(
+                "eval.metrics._load_biomedclip",
+                return_value=(MagicMock(), MagicMock(), MagicMock(), torch.device("cpu")),
+            ),
+            patch(
+                "eval.metrics.compute_biomedclip_features",
+                side_effect=[real_biomedclip_features, generated_biomedclip_features],
+            ),
+            patch("eval.metrics.compute_biomedclip_i", return_value=(0.654, 0.321)),
+            patch("eval.metrics.compute_biomedclip_t", return_value=(0.543, 0.432)),
         ):
             result = evaluate_generation_quality(
                 real_image_dir="/tmp/real",
@@ -90,7 +118,9 @@ class MetricsSmokeTest(unittest.TestCase):
                 num_workers=2,
                 inception_weights_path="/tmp/inception.pth",
                 clip_model_path="/tmp/clip",
+                biomedclip_model_path="/tmp/biomedclip",
                 real_inception_cache_dir="/tmp/cache",
+                real_biomedclip_cache_dir="/tmp/cache",
             )
         self.assertEqual(mock_inception.call_count, 2)
         self.assertEqual(
@@ -103,6 +133,11 @@ class MetricsSmokeTest(unittest.TestCase):
                 "clip_i_std": 0.12,
                 "clip_t_mean": 0.77,
                 "clip_t_std": 0.23,
+                "med_fid": 45.68,
+                "biomedclip_i_mean": 0.65,
+                "biomedclip_i_std": 0.32,
+                "biomedclip_t_mean": 0.54,
+                "biomedclip_t_std": 0.43,
             },
         )
 

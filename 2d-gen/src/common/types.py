@@ -41,3 +41,8 @@ class MetricResult:
     clip_i_std: float
     clip_t_mean: float
     clip_t_std: float
+    med_fid: float
+    biomedclip_i_mean: float
+    biomedclip_i_std: float
+    biomedclip_t_mean: float
+    biomedclip_t_std: float

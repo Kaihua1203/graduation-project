@@ -5,3 +5,6 @@ DEFAULT_INCEPTION_WEIGHTS_PATH = (
 DEFAULT_CLIP_MODEL_PATH = (
     "/home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/clip-vit-base-patch32"
 )
+DEFAULT_BIOMEDCLIP_MODEL_PATH = (
+    "/home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/BiomedCLIP"
+)

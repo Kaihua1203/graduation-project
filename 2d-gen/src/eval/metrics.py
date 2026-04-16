@@ -13,12 +13,13 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import models, transforms
 from transformers import AutoTokenizer, CLIPModel
 
-from common.constants import DEFAULT_CLIP_MODEL_PATH, DEFAULT_INCEPTION_WEIGHTS_PATH
+from common.constants import DEFAULT_BIOMEDCLIP_MODEL_PATH, DEFAULT_CLIP_MODEL_PATH, DEFAULT_INCEPTION_WEIGHTS_PATH
 from common.types import MetricResult
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
 INCEPTION_CACHE_VERSION = "v1"
+BIOMEDCLIP_CACHE_VERSION = "v1"
 
 
 def list_images(directory: str | Path) -> list[Path]:
@@ -49,8 +50,13 @@ class ImageTensorDataset(Dataset[torch.Tensor]):
 
 
 class ClipTPairDataset(Dataset[tuple[torch.Tensor, str]]):
-    def __init__(self, records: list[dict[str, str]]) -> None:
+    def __init__(
+        self,
+        records: list[dict[str, str]],
+        preprocess_fn: Callable[[Image.Image], torch.Tensor] | None = None,
+    ) -> None:
         self.records = records
+        self.preprocess_fn = preprocess_fn or _preprocess_for_clip
 
     def __len__(self) -> int:
         return len(self.records)
@@ -58,12 +64,17 @@ class ClipTPairDataset(Dataset[tuple[torch.Tensor, str]]):
     def __getitem__(self, index: int) -> tuple[torch.Tensor, str]:
         record = self.records[index]
         image = Image.open(record["image_path"]).convert("RGB")
-        return _preprocess_for_clip(image), record["prompt"]
+        return self.preprocess_fn(image), record["prompt"]
 
 
 class ClipIImagePairDataset(Dataset[torch.Tensor]):
-    def __init__(self, paired_paths: list[tuple[Path, Path]]) -> None:
+    def __init__(
+        self,
+        paired_paths: list[tuple[Path, Path]],
+        preprocess_fn: Callable[[Image.Image], torch.Tensor] | None = None,
+    ) -> None:
         self.paired_paths = paired_paths
+        self.preprocess_fn = preprocess_fn or _preprocess_for_clip
 
     def __len__(self) -> int:
         return len(self.paired_paths)
@@ -73,7 +84,7 @@ class ClipIImagePairDataset(Dataset[torch.Tensor]):
         real_image = Image.open(real_path).convert("RGB")
         generated_image = Image.open(generated_path).convert("RGB")
         return torch.stack(
-            [_preprocess_for_clip(real_image), _preprocess_for_clip(generated_image)],
+            [self.preprocess_fn(real_image), self.preprocess_fn(generated_image)],
             dim=0,
         )
 
@@ -255,6 +266,113 @@ def compute_inception_features_and_probs(
     )
 
 
+@torch.no_grad()
+def _extract_biomedclip_features(
+    image_paths: list[Path],
+    batch_size: int,
+    num_workers: int,
+    model: torch.nn.Module,
+    preprocess_fn: Callable[[Image.Image], torch.Tensor],
+    device: torch.device,
+) -> np.ndarray:
+    dataloader = _build_dataloader(
+        ImageTensorDataset(image_paths, preprocess_fn=preprocess_fn),
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+    total_batches, log_every = _iter_progress_steps(len(image_paths), batch_size)
+    all_features = []
+    for batch_index, batch in enumerate(dataloader, start=1):
+        batch = batch.to(device, non_blocking=device.type == "cuda")
+        features = _encode_biomedclip_images(model, batch)
+        all_features.append(features.detach().cpu().to(dtype=torch.float64).numpy())
+        if batch_index == 1 or batch_index % log_every == 0 or batch_index == total_batches:
+            _log_progress(f"BiomedCLIP feature batches: {batch_index}/{total_batches}")
+    return np.concatenate(all_features, axis=0)
+
+
+def _build_biomedclip_cache_path(
+    image_paths: list[Path],
+    biomedclip_model_path: str | Path,
+    cache_dir: str | Path,
+) -> Path:
+    resolved_model_path = Path(biomedclip_model_path).expanduser().resolve()
+    config_path = resolved_model_path / "open_clip_config.json"
+    checkpoint_path = resolved_model_path / "open_clip_pytorch_model.bin"
+    signature = hashlib.sha256()
+    signature.update(BIOMEDCLIP_CACHE_VERSION.encode("utf-8"))
+    signature.update(str(resolved_model_path).encode("utf-8"))
+    for model_file in (config_path, checkpoint_path):
+        resolved_file = model_file.resolve()
+        stat = resolved_file.stat()
+        signature.update(str(resolved_file).encode("utf-8"))
+        signature.update(str(stat.st_size).encode("utf-8"))
+        signature.update(str(stat.st_mtime_ns).encode("utf-8"))
+    for path in image_paths:
+        resolved_path = path.resolve()
+        stat = resolved_path.stat()
+        signature.update(str(resolved_path).encode("utf-8"))
+        signature.update(str(stat.st_size).encode("utf-8"))
+        signature.update(str(stat.st_mtime_ns).encode("utf-8"))
+    resolved_cache_dir = Path(cache_dir).expanduser().resolve()
+    resolved_cache_dir.mkdir(parents=True, exist_ok=True)
+    return resolved_cache_dir / f"real_biomedclip_{signature.hexdigest()}.npz"
+
+
+def _load_cached_biomedclip_features(cache_path: Path) -> np.ndarray | None:
+    if not cache_path.exists():
+        return None
+    _log_progress(f"Loading cached BiomedCLIP features from {cache_path}")
+    with np.load(cache_path) as data:
+        return data["features"]
+
+
+def _write_cached_biomedclip_features(cache_path: Path, features: np.ndarray) -> None:
+    np.savez_compressed(cache_path, features=features)
+    _log_progress(f"Saved cached BiomedCLIP features to {cache_path}")
+
+
+def compute_biomedclip_features(
+    image_dir: str | Path,
+    batch_size: int,
+    num_workers: int,
+    model: torch.nn.Module,
+    device: torch.device,
+    preprocess_fn: Callable[[Image.Image], torch.Tensor],
+    biomedclip_model_path: str | Path = DEFAULT_BIOMEDCLIP_MODEL_PATH,
+    cache_dir: str | Path | None = None,
+    use_cache: bool = False,
+) -> np.ndarray:
+    image_paths = list_images(image_dir)
+    _log_progress(
+        f"BiomedCLIP feature extraction from {image_dir} on {device.type} for {len(image_paths)} images "
+        f"({max(1, (len(image_paths) + batch_size - 1) // batch_size)} batches, batch_size={batch_size})"
+    )
+    if use_cache and cache_dir is not None:
+        cache_path = _build_biomedclip_cache_path(image_paths, biomedclip_model_path, cache_dir)
+        cached_features = _load_cached_biomedclip_features(cache_path)
+        if cached_features is not None:
+            return cached_features
+        features = _extract_biomedclip_features(
+            image_paths=image_paths,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            model=model,
+            preprocess_fn=preprocess_fn,
+            device=device,
+        )
+        _write_cached_biomedclip_features(cache_path, features)
+        return features
+    return _extract_biomedclip_features(
+        image_paths=image_paths,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=model,
+        preprocess_fn=preprocess_fn,
+        device=device,
+    )
+
+
 def frechet_distance(mu1: np.ndarray, sigma1: np.ndarray, mu2: np.ndarray, sigma2: np.ndarray) -> float:
     sigma1 = (sigma1 + sigma1.T) / 2.0
     sigma2 = (sigma2 + sigma2.T) / 2.0
@@ -323,6 +441,72 @@ def _load_clip(clip_model_path: str | Path) -> tuple[CLIPModel, AutoTokenizer, t
     return model, tokenizer, device
 
 
+def _resolve_local_hf_repo_path(repo_id: str) -> Path | None:
+    cached_root = Path.home() / ".cache" / "huggingface" / "hub"
+    repo_cache_dir = cached_root / f"models--{repo_id.replace('/', '--')}"
+    snapshots_dir = repo_cache_dir / "snapshots"
+    if not snapshots_dir.is_dir():
+        return None
+    snapshot_dirs = [path for path in snapshots_dir.iterdir() if path.is_dir()]
+    if not snapshot_dirs:
+        return None
+    return max(snapshot_dirs, key=lambda path: path.stat().st_mtime)
+
+
+def _load_biomedclip(
+    biomedclip_model_path: str | Path,
+) -> tuple[torch.nn.Module, Callable[[list[str]], torch.Tensor], Callable[[Image.Image], torch.Tensor], torch.device]:
+    try:
+        from open_clip import create_model_and_transforms, get_tokenizer
+        from open_clip.factory import _MODEL_CONFIGS
+    except ImportError as exc:
+        raise ImportError(
+            "BiomedCLIP evaluation requires open_clip_torch. Install open_clip_torch==2.23.0 in the active environment."
+        ) from exc
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    resolved_model_path = Path(biomedclip_model_path).expanduser().resolve()
+    config_path = resolved_model_path / "open_clip_config.json"
+    checkpoint_path = resolved_model_path / "open_clip_pytorch_model.bin"
+    if not config_path.is_file():
+        raise FileNotFoundError(f"Missing BiomedCLIP config: {config_path}")
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"Missing BiomedCLIP checkpoint: {checkpoint_path}")
+
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = json.load(handle)
+    model_cfg = dict(config["model_cfg"])
+    text_cfg = dict(model_cfg["text_cfg"])
+    hf_model_name = text_cfg.get("hf_model_name")
+    if hf_model_name:
+        local_hf_model_path = _resolve_local_hf_repo_path(hf_model_name)
+        if local_hf_model_path is None:
+            raise FileNotFoundError(
+                f"BiomedCLIP text encoder dependency is not cached locally: {hf_model_name}"
+            )
+        text_cfg["hf_model_name"] = str(local_hf_model_path)
+        text_cfg["hf_tokenizer_name"] = str(local_hf_model_path)
+    model_cfg["text_cfg"] = text_cfg
+    preprocess_cfg = config["preprocess_cfg"]
+    model_name = f"biomedclip_local_{hashlib.sha256(str(resolved_model_path).encode('utf-8')).hexdigest()[:12]}"
+    _MODEL_CONFIGS[model_name] = model_cfg
+
+    model, _, preprocess = create_model_and_transforms(
+        model_name=model_name,
+        pretrained=str(checkpoint_path),
+        **{f"image_{key}": value for key, value in preprocess_cfg.items()},
+    )
+    tokenizer_impl = get_tokenizer(model_name)
+    context_length = int(model_cfg["text_cfg"].get("context_length", 256))
+
+    def tokenize(texts: list[str]) -> torch.Tensor:
+        return tokenizer_impl(texts, context_length=context_length)
+
+    model = model.to(device)
+    model.eval()
+    return model, tokenize, preprocess, device
+
+
 def _load_manifest_records(manifest_path: str | Path) -> list[dict[str, str]]:
     resolved_manifest_path = Path(manifest_path).expanduser().resolve()
     records = []
@@ -334,6 +518,20 @@ def _load_manifest_records(manifest_path: str | Path) -> list[dict[str, str]]:
     if not records:
         raise ValueError(f"No prompt/image pairs found in {resolved_manifest_path}")
     return records
+
+
+def _encode_biomedclip_images(model: torch.nn.Module, pixel_values: torch.Tensor) -> torch.Tensor:
+    return F.normalize(model.encode_image(pixel_values), dim=-1)
+
+
+def _encode_biomedclip_text(
+    model: torch.nn.Module,
+    tokenizer: Callable[[list[str]], torch.Tensor],
+    prompts: list[str],
+    device: torch.device,
+) -> torch.Tensor:
+    text_inputs = tokenizer(prompts).to(device)
+    return F.normalize(model.encode_text(text_inputs), dim=-1)
 
 
 @torch.no_grad()
@@ -407,6 +605,73 @@ def compute_clip_i(
     return float(np.mean(similarities)), float(np.std(similarities))
 
 
+@torch.no_grad()
+def compute_biomedclip_t(
+    generated_manifest_path: str | Path,
+    batch_size: int,
+    num_workers: int,
+    model: torch.nn.Module,
+    tokenizer: Callable[[list[str]], torch.Tensor],
+    preprocess_fn: Callable[[Image.Image], torch.Tensor],
+    device: torch.device,
+) -> tuple[float, float]:
+    manifest_path = Path(generated_manifest_path).expanduser().resolve()
+    similarities = []
+    records = _load_manifest_records(manifest_path)
+    dataloader = _build_dataloader(
+        ClipTPairDataset(records, preprocess_fn=preprocess_fn),
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+    total_records = len(records)
+    total_batches, log_every = _iter_progress_steps(total_records, batch_size)
+    _log_progress(f"BiomedCLIP-T from {manifest_path} on {device.type} for {total_records} prompt/image pairs")
+    for batch_index, (pixel_values, prompts) in enumerate(dataloader, start=1):
+        pixel_values = pixel_values.to(device, non_blocking=device.type == "cuda")
+        image_embeds = _encode_biomedclip_images(model, pixel_values)
+        text_embeds = _encode_biomedclip_text(model, tokenizer, list(prompts), device)
+        similarities.extend(torch.sum(image_embeds * text_embeds, dim=-1).detach().cpu().tolist())
+        if batch_index == 1 or batch_index % log_every == 0 or batch_index == total_batches:
+            _log_progress(f"BiomedCLIP-T batches: {batch_index}/{total_batches}")
+    return float(np.mean(similarities)), float(np.std(similarities))
+
+
+@torch.no_grad()
+def compute_biomedclip_i(
+    real_image_dir: str | Path,
+    generated_image_dir: str | Path,
+    batch_size: int,
+    num_workers: int,
+    model: torch.nn.Module,
+    preprocess_fn: Callable[[Image.Image], torch.Tensor],
+    device: torch.device,
+) -> tuple[float, float]:
+    real_paths = list_images(real_image_dir)
+    generated_paths = list_images(generated_image_dir)
+    similarities = []
+    paired_paths = pair_clip_i_paths(real_paths, generated_paths)
+    total_pairs = len(paired_paths)
+    dataloader = _build_dataloader(
+        ClipIImagePairDataset(paired_paths, preprocess_fn=preprocess_fn),
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+    total_batches, log_every = _iter_progress_steps(total_pairs, batch_size)
+    _log_progress(f"BiomedCLIP-I on {device.type} for {total_pairs} aligned image pairs")
+    for batch_index, pixel_values in enumerate(dataloader, start=1):
+        pixel_values = pixel_values.to(device, non_blocking=device.type == "cuda")
+        batch_size_current = pixel_values.shape[0]
+        flattened_pixel_values = pixel_values.view(-1, *pixel_values.shape[2:])
+        image_embeds = _encode_biomedclip_images(model, flattened_pixel_values)
+        image_embeds = image_embeds.view(batch_size_current, 2, -1)
+        similarities.extend(
+            torch.sum(image_embeds[:, 0] * image_embeds[:, 1], dim=-1).detach().cpu().tolist()
+        )
+        if batch_index == 1 or batch_index % log_every == 0 or batch_index == total_batches:
+            _log_progress(f"BiomedCLIP-I batches: {batch_index}/{total_batches}")
+    return float(np.mean(similarities)), float(np.std(similarities))
+
+
 def evaluate_generation_quality(
     real_image_dir: str | Path,
     generated_image_dir: str | Path,
@@ -415,7 +680,9 @@ def evaluate_generation_quality(
     num_workers: int = 0,
     inception_weights_path: str | Path = DEFAULT_INCEPTION_WEIGHTS_PATH,
     clip_model_path: str | Path = DEFAULT_CLIP_MODEL_PATH,
+    biomedclip_model_path: str | Path = DEFAULT_BIOMEDCLIP_MODEL_PATH,
     real_inception_cache_dir: str | Path | None = None,
+    real_biomedclip_cache_dir: str | Path | None = None,
 ) -> MetricResult:
     if num_workers < 0:
         raise ValueError("eval.num_workers must be non-negative.")
@@ -457,6 +724,52 @@ def evaluate_generation_quality(
         num_workers=num_workers,
         clip_model_path=clip_model_path,
     )
+    _log_progress("Loading BiomedCLIP model")
+    biomedclip_model, biomedclip_tokenizer, biomedclip_preprocess, biomedclip_device = _load_biomedclip(
+        biomedclip_model_path
+    )
+    _log_progress("Starting Med-FID")
+    real_biomedclip_features = compute_biomedclip_features(
+        image_dir=real_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        device=biomedclip_device,
+        preprocess_fn=biomedclip_preprocess,
+        biomedclip_model_path=biomedclip_model_path,
+        cache_dir=real_biomedclip_cache_dir,
+        use_cache=real_biomedclip_cache_dir is not None,
+    )
+    generated_biomedclip_features = compute_biomedclip_features(
+        image_dir=generated_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        device=biomedclip_device,
+        preprocess_fn=biomedclip_preprocess,
+        biomedclip_model_path=biomedclip_model_path,
+    )
+    med_fid = compute_fid(real_biomedclip_features, generated_biomedclip_features)
+    _log_progress("Starting BiomedCLIP-I")
+    biomedclip_i_mean, biomedclip_i_std = compute_biomedclip_i(
+        real_image_dir,
+        generated_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        preprocess_fn=biomedclip_preprocess,
+        device=biomedclip_device,
+    )
+    _log_progress("Starting BiomedCLIP-T")
+    biomedclip_t_mean, biomedclip_t_std = compute_biomedclip_t(
+        generated_manifest_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        tokenizer=biomedclip_tokenizer,
+        preprocess_fn=biomedclip_preprocess,
+        device=biomedclip_device,
+    )
     _log_progress("Finished evaluation")
     return MetricResult(
         fid=round(fid, 2),
@@ -466,4 +779,9 @@ def evaluate_generation_quality(
         clip_i_std=round(clip_i_std, 2),
         clip_t_mean=round(clip_t_mean, 2),
         clip_t_std=round(clip_t_std, 2),
+        med_fid=round(med_fid, 2),
+        biomedclip_i_mean=round(biomedclip_i_mean, 2),
+        biomedclip_i_std=round(biomedclip_i_std, 2),
+        biomedclip_t_mean=round(biomedclip_t_mean, 2),
+        biomedclip_t_std=round(biomedclip_t_std, 2),
     )

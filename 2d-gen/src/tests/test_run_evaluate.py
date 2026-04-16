@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
+from common.constants import DEFAULT_BIOMEDCLIP_MODEL_PATH, DEFAULT_CLIP_MODEL_PATH, DEFAULT_INCEPTION_WEIGHTS_PATH
 from common.types import MetricResult
 from eval.run_evaluate import main
 
@@ -27,7 +28,9 @@ class RunEvaluateTest(unittest.TestCase):
                     "num_workers": 3,
                     "inception_weights_path": "/tmp/inception.pth",
                     "clip_model_path": "/tmp/clip",
+                    "biomedclip_model_path": "/tmp/biomedclip",
                     "real_inception_cache_dir": str(Path(tmpdir) / "cache"),
+                    "real_biomedclip_cache_dir": str(Path(tmpdir) / "cache"),
                 }
             }
             with (
@@ -44,6 +47,11 @@ class RunEvaluateTest(unittest.TestCase):
                         clip_i_std=5.0,
                         clip_t_mean=6.0,
                         clip_t_std=7.0,
+                        med_fid=8.0,
+                        biomedclip_i_mean=9.0,
+                        biomedclip_i_std=10.0,
+                        biomedclip_t_mean=11.0,
+                        biomedclip_t_std=12.0,
                     ),
                 ) as mock_evaluate,
                 patch("eval.run_evaluate.write_json", return_value=timestamped_output_path),
@@ -58,7 +66,9 @@ class RunEvaluateTest(unittest.TestCase):
             num_workers=3,
             inception_weights_path="/tmp/inception.pth",
             clip_model_path="/tmp/clip",
+            biomedclip_model_path="/tmp/biomedclip",
             real_inception_cache_dir=str(Path(tmpdir) / "cache"),
+            real_biomedclip_cache_dir=str(Path(tmpdir) / "cache"),
         )
 
     def test_main_defaults_real_inception_cache_dir_next_to_output(self) -> None:
@@ -76,6 +86,7 @@ class RunEvaluateTest(unittest.TestCase):
                     "num_workers": 0,
                     "inception_weights_path": "/tmp/inception.pth",
                     "clip_model_path": "/tmp/clip",
+                    "biomedclip_model_path": "/tmp/biomedclip",
                 }
             }
             with (
@@ -92,6 +103,11 @@ class RunEvaluateTest(unittest.TestCase):
                         clip_i_std=5.0,
                         clip_t_mean=6.0,
                         clip_t_std=7.0,
+                        med_fid=8.0,
+                        biomedclip_i_mean=9.0,
+                        biomedclip_i_std=10.0,
+                        biomedclip_t_mean=11.0,
+                        biomedclip_t_std=12.0,
                     ),
                 ) as mock_evaluate,
                 patch("eval.run_evaluate.write_json", return_value=timestamped_output_path),
@@ -106,7 +122,60 @@ class RunEvaluateTest(unittest.TestCase):
             num_workers=0,
             inception_weights_path="/tmp/inception.pth",
             clip_model_path="/tmp/clip",
+            biomedclip_model_path="/tmp/biomedclip",
             real_inception_cache_dir=timestamped_output_path.parent.resolve() / "cache",
+            real_biomedclip_cache_dir=timestamped_output_path.parent.resolve() / "cache",
+        )
+
+    def test_main_defaults_model_paths_when_not_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "metrics.json"
+            timestamp = datetime(2026, 3, 31, 12, 34, 56)
+            timestamped_output_path = output_path.with_name("metrics_20260331_123456.json")
+            config = {
+                "eval": {
+                    "real_image_dir": "/tmp/real",
+                    "generated_image_dir": "/tmp/generated",
+                    "generated_manifest": "/tmp/generated/metadata.jsonl",
+                    "output_path": str(output_path),
+                }
+            }
+            with (
+                patch.object(sys, "argv", ["run_evaluate.py", "--config", "/tmp/eval.yaml"]),
+                patch("eval.run_evaluate.datetime") as mock_datetime,
+                patch("eval.run_evaluate.load_yaml_config", return_value=config),
+                patch(
+                    "eval.run_evaluate.evaluate_generation_quality",
+                    return_value=MetricResult(
+                        fid=1.0,
+                        inception_score_mean=2.0,
+                        inception_score_std=3.0,
+                        clip_i_mean=4.0,
+                        clip_i_std=5.0,
+                        clip_t_mean=6.0,
+                        clip_t_std=7.0,
+                        med_fid=8.0,
+                        biomedclip_i_mean=9.0,
+                        biomedclip_i_std=10.0,
+                        biomedclip_t_mean=11.0,
+                        biomedclip_t_std=12.0,
+                    ),
+                ) as mock_evaluate,
+                patch("eval.run_evaluate.write_json", return_value=timestamped_output_path),
+            ):
+                mock_datetime.now.return_value = timestamp
+                main()
+        mock_evaluate.assert_called_once_with(
+            real_image_dir="/tmp/real",
+            generated_image_dir="/tmp/generated",
+            generated_manifest_path="/tmp/generated/metadata.jsonl",
+            batch_size=8,
+            num_workers=0,
+            inception_weights_path=DEFAULT_INCEPTION_WEIGHTS_PATH,
+            clip_model_path=DEFAULT_CLIP_MODEL_PATH,
+            biomedclip_model_path=DEFAULT_BIOMEDCLIP_MODEL_PATH,
+            real_inception_cache_dir=timestamped_output_path.parent.resolve() / "cache",
+            real_biomedclip_cache_dir=timestamped_output_path.parent.resolve() / "cache",
         )
 
 

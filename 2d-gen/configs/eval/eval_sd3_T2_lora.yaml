@@ -8,3 +8,5 @@ eval:
   real_inception_cache_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/cache_t2
   inception_weights_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/inception_v3/inception_v3_google-0cc3c7bd.pth
   clip_model_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/clip-vit-base-patch32
+  biomedclip_model_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/BiomedCLIP
+  real_biomedclip_cache_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/cache_t2

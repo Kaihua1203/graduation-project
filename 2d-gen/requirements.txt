@@ -9,4 +9,5 @@ swanlab>=0.7.13
 torch>=2.11.0
 torchvision>=0.26.0
 transformers>=4.57.3
+open_clip_torch==2.23.0
 tqdm
