@@ -1,0 +1,11 @@
+eval:
+  real_image_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/test/T2/images
+  generated_image_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/infer/uncond_ldm_m4raw_t2
+  output_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/uncond_ldm_m4raw_t2/metrics.json
+  batch_size: 8
+  num_workers: 4
+  real_inception_cache_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/cache_t2
+  inception_weights_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/inception_v3/inception_v3_google-0cc3c7bd.pth
+  clip_model_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/clip-vit-base-patch32
+  biomedclip_model_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/BiomedCLIP
+  real_biomedclip_cache_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/eval/cache_t2

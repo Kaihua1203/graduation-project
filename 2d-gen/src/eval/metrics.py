@@ -14,7 +14,7 @@ from torchvision import models, transforms
 from transformers import AutoTokenizer, CLIPModel
 
 from common.constants import DEFAULT_BIOMEDCLIP_MODEL_PATH, DEFAULT_CLIP_MODEL_PATH, DEFAULT_INCEPTION_WEIGHTS_PATH
-from common.types import MetricResult
+from common.types import MetricResult, UnconditionalMetricResult
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
@@ -98,6 +98,27 @@ def pair_clip_i_paths(real_paths: list[Path], generated_paths: list[Path]) -> li
         raise ValueError(
             "CLIP-I requires matching filenames between real and generated directories."
         )
+    return list(zip(real_paths, generated_paths))
+
+
+def validate_aligned_image_dirs(
+    real_image_dir: str | Path,
+    generated_image_dir: str | Path,
+) -> list[tuple[Path, Path]]:
+    real_paths = list_images(real_image_dir)
+    generated_paths = list_images(generated_image_dir)
+    if len(real_paths) != len(generated_paths):
+        raise ValueError(
+            "Unconditional evaluation requires matching image counts between "
+            f"{Path(real_image_dir).expanduser().resolve()} and {Path(generated_image_dir).expanduser().resolve()} "
+            f"(got {len(real_paths)} real vs {len(generated_paths)} generated)."
+        )
+    for real_path, generated_path in zip(real_paths, generated_paths):
+        if real_path.name != generated_path.name:
+            raise ValueError(
+                "Unconditional evaluation requires identical sorted filenames between real and generated "
+                f"directories; first mismatch: {real_path.name} != {generated_path.name}."
+            )
     return list(zip(real_paths, generated_paths))
 
 
@@ -784,4 +805,104 @@ def evaluate_generation_quality(
         biomedclip_i_std=round(biomedclip_i_std, 2),
         biomedclip_t_mean=round(biomedclip_t_mean, 2),
         biomedclip_t_std=round(biomedclip_t_std, 2),
+    )
+
+
+def evaluate_unconditional_generation_quality(
+    real_image_dir: str | Path,
+    generated_image_dir: str | Path,
+    batch_size: int,
+    num_workers: int = 0,
+    inception_weights_path: str | Path = DEFAULT_INCEPTION_WEIGHTS_PATH,
+    clip_model_path: str | Path = DEFAULT_CLIP_MODEL_PATH,
+    biomedclip_model_path: str | Path = DEFAULT_BIOMEDCLIP_MODEL_PATH,
+    real_inception_cache_dir: str | Path | None = None,
+    real_biomedclip_cache_dir: str | Path | None = None,
+) -> UnconditionalMetricResult:
+    if num_workers < 0:
+        raise ValueError("eval.num_workers must be non-negative.")
+    validate_aligned_image_dirs(real_image_dir, generated_image_dir)
+
+    inception_model, inception_device = _load_inception_backbone(inception_weights_path)
+    _log_progress("Starting FID")
+    real_features, _ = compute_inception_features_and_probs(
+        image_dir=real_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=inception_model,
+        device=inception_device,
+        inception_weights_path=inception_weights_path,
+        cache_dir=real_inception_cache_dir,
+        use_cache=real_inception_cache_dir is not None,
+    )
+    generated_features, generated_probs = compute_inception_features_and_probs(
+        image_dir=generated_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=inception_model,
+        device=inception_device,
+        inception_weights_path=inception_weights_path,
+    )
+    fid = compute_fid(real_features, generated_features)
+
+    _log_progress("Starting Inception Score")
+    is_mean, is_std = compute_inception_score(generated_probs)
+
+    _log_progress("Starting CLIP-I")
+    clip_i_mean, clip_i_std = compute_clip_i(
+        real_image_dir,
+        generated_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        clip_model_path=clip_model_path,
+    )
+
+    _log_progress("Loading BiomedCLIP model")
+    biomedclip_model, _, biomedclip_preprocess, biomedclip_device = _load_biomedclip(
+        biomedclip_model_path
+    )
+
+    _log_progress("Starting Med-FID")
+    real_biomedclip_features = compute_biomedclip_features(
+        image_dir=real_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        device=biomedclip_device,
+        preprocess_fn=biomedclip_preprocess,
+        biomedclip_model_path=biomedclip_model_path,
+        cache_dir=real_biomedclip_cache_dir,
+        use_cache=real_biomedclip_cache_dir is not None,
+    )
+    generated_biomedclip_features = compute_biomedclip_features(
+        image_dir=generated_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        device=biomedclip_device,
+        preprocess_fn=biomedclip_preprocess,
+        biomedclip_model_path=biomedclip_model_path,
+    )
+    med_fid = compute_fid(real_biomedclip_features, generated_biomedclip_features)
+
+    _log_progress("Starting BiomedCLIP-I")
+    biomedclip_i_mean, biomedclip_i_std = compute_biomedclip_i(
+        real_image_dir,
+        generated_image_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        model=biomedclip_model,
+        preprocess_fn=biomedclip_preprocess,
+        device=biomedclip_device,
+    )
+    _log_progress("Finished evaluation")
+    return UnconditionalMetricResult(
+        fid=round(fid, 2),
+        inception_score_mean=round(is_mean, 2),
+        inception_score_std=round(is_std, 2),
+        clip_i_mean=round(clip_i_mean, 2),
+        clip_i_std=round(clip_i_std, 2),
+        med_fid=round(med_fid, 2),
+        biomedclip_i_mean=round(biomedclip_i_mean, 2),
+        biomedclip_i_std=round(biomedclip_i_std, 2),
     )

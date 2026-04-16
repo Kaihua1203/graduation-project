@@ -46,3 +46,15 @@ class MetricResult:
     biomedclip_i_std: float
     biomedclip_t_mean: float
     biomedclip_t_std: float
+
+
+@dataclass
+class UnconditionalMetricResult:
+    fid: float
+    inception_score_mean: float
+    inception_score_std: float
+    clip_i_mean: float
+    clip_i_std: float
+    med_fid: float
+    biomedclip_i_mean: float
+    biomedclip_i_std: float
