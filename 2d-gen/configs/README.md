@@ -43,6 +43,7 @@
 - `distributed.find_unused_parameters`
 
 `bash scripts/run_train.sh <config.yaml> [accelerate args...]` forwards extra arguments to `accelerate launch`. Single-GPU launches can omit launcher flags, while multi-GPU launches must pass `--multi_gpu`, `--num_processes`, and a matching `CUDA_VISIBLE_DEVICES` list, for example `CUDA_VISIBLE_DEVICES=0,1 bash scripts/run_train.sh configs/train/train_sd_lora_example.yaml --multi_gpu --num_processes 2`. Distributed launcher settings should be passed via `accelerate launch`, not stored in the YAML config.
+`bash scripts/run_train.sh` auto-detects unconditional latent diffusion configs by `model.model_type: uncond_ldm` and routes them to `src/train/run_train_uncond_ldm.py`.
 
 Train config examples under `train/`:
 
@@ -144,7 +145,7 @@ Pass `--resume` to continue unfinished runs and skip existing `sample_*.png` fil
 - `eval.biomedclip_model_path`
 - `eval.real_biomedclip_cache_dir`
 
-`unconditional eval` uses `python src/eval/run_evaluate_uncond.py --config <config.yaml>` with the same `eval.*` section shape except:
+`bash scripts/run_eval.sh <config.yaml>` auto-routes configs without `eval.generated_manifest` to `src/eval/run_evaluate_uncond.py`. Unconditional eval uses the same `eval.*` section shape except:
 
 - `eval.generated_manifest` is not used and must be omitted
 - generated filenames must match the sorted real-image filenames exactly

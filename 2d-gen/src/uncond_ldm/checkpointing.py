@@ -11,8 +11,8 @@ from common.diffusers_import import prepare_diffusers_import
 UNET_DIRNAME = "unet"
 SCHEDULER_DIRNAME = "scheduler"
 SCHEDULER_CONFIG_FILENAME = "scheduler_config.json"
-METADATA_FILENAME = "model_metadata.json"
-TRAINING_SUMMARY_FILENAME = "training_summary.json"
+METADATA_FILENAMES = ("model_metadata.json", "metadata.json")
+TRAINING_SUMMARY_FILENAMES = ("training_summary.json", "train_summary.json")
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,8 @@ def load_export_bundle_paths(path: str | Path) -> ExportBundlePaths:
 
     unet_dir = bundle_dir / UNET_DIRNAME
     scheduler_dir = bundle_dir / SCHEDULER_DIRNAME
-    metadata_path = bundle_dir / METADATA_FILENAME
-    training_summary_path = bundle_dir / TRAINING_SUMMARY_FILENAME
+    metadata_path = _resolve_required_file(bundle_dir, METADATA_FILENAMES)
+    training_summary_path = _resolve_required_file(bundle_dir, TRAINING_SUMMARY_FILENAMES)
 
     missing_paths: list[str] = []
     if not unet_dir.is_dir():
@@ -43,10 +43,10 @@ def load_export_bundle_paths(path: str | Path) -> ExportBundlePaths:
         missing_paths.append(str(scheduler_dir))
     if not (scheduler_dir / SCHEDULER_CONFIG_FILENAME).is_file():
         missing_paths.append(str(scheduler_dir / SCHEDULER_CONFIG_FILENAME))
-    if not metadata_path.is_file():
-        missing_paths.append(str(metadata_path))
-    if not training_summary_path.is_file():
-        missing_paths.append(str(training_summary_path))
+    if metadata_path is None:
+        missing_paths.extend(str(bundle_dir / filename) for filename in METADATA_FILENAMES)
+    if training_summary_path is None:
+        missing_paths.extend(str(bundle_dir / filename) for filename in TRAINING_SUMMARY_FILENAMES)
     if missing_paths:
         raise FileNotFoundError(
             "Export bundle is missing required artifacts:\n- " + "\n- ".join(missing_paths)
@@ -81,11 +81,14 @@ def load_inference_components(
         ddim_cls=DDIMScheduler,
         ddpm_cls=DDPMScheduler,
     )
-    resolved_vae_path = _resolve_vae_path(bundle.metadata, vae_path)
+    resolved_vae_path, resolved_vae_subfolder = _resolve_vae_source(bundle.metadata, vae_path)
 
     unet = UNet2DModel.from_pretrained(bundle.unet_dir, local_files_only=local_files_only)
     scheduler = scheduler_cls.from_pretrained(bundle.scheduler_dir, local_files_only=local_files_only)
-    vae = AutoencoderKL.from_pretrained(resolved_vae_path, local_files_only=local_files_only)
+    vae_kwargs: dict[str, Any] = {"local_files_only": local_files_only}
+    if resolved_vae_subfolder is not None:
+        vae_kwargs["subfolder"] = resolved_vae_subfolder
+    vae = AutoencoderKL.from_pretrained(resolved_vae_path, **vae_kwargs)
     return unet, scheduler, vae
 
 
@@ -124,9 +127,17 @@ def _resolve_scheduler_class(
     raise ValueError(f"Unsupported scheduler type: {resolved_name}")
 
 
-def _resolve_vae_path(metadata: dict[str, Any], override_path: str | None) -> str:
+def _resolve_required_file(bundle_dir: Path, candidate_filenames: tuple[str, ...]) -> Path | None:
+    for filename in candidate_filenames:
+        candidate_path = bundle_dir / filename
+        if candidate_path.is_file():
+            return candidate_path
+    return None
+
+
+def _resolve_vae_source(metadata: dict[str, Any], override_path: str | None) -> tuple[str, str | None]:
     if override_path is not None:
-        return str(Path(override_path).expanduser().resolve())
+        return str(Path(override_path).expanduser().resolve()), None
 
     vae_source = metadata.get("vae")
     if not isinstance(vae_source, dict):
@@ -137,4 +148,7 @@ def _resolve_vae_path(metadata: dict[str, Any], override_path: str | None) -> st
         raise ValueError(
             "Export metadata 'vae' mapping must contain 'pretrained_model_name_or_path' or 'path'."
         )
-    return str(Path(pretrained_path).expanduser().resolve())
+    subfolder = vae_source.get("subfolder")
+    if subfolder is not None and (not isinstance(subfolder, str) or not subfolder.strip()):
+        raise ValueError("Export metadata 'vae.subfolder' must be a non-empty string when provided.")
+    return str(Path(pretrained_path).expanduser().resolve()), subfolder

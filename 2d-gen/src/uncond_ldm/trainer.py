@@ -28,6 +28,9 @@ from diffusers.optimization import get_scheduler
 
 LOGGER = logging.getLogger(__name__)
 
+MODEL_METADATA_FILENAMES = ("model_metadata.json", "metadata.json")
+TRAINING_SUMMARY_FILENAMES = ("training_summary.json", "train_summary.json")
+
 
 def flatten_config(prefix: str, value: Any, output: dict[str, Any]) -> None:
     if isinstance(value, dict):
@@ -352,9 +355,11 @@ class UncondLatentDiffusionTrainer:
                 "min_loss": float(min(loss_history)) if loss_history else math.nan,
                 "export_dir": str(self.export_dir),
             }
-            write_json(metadata, self.export_dir / "metadata.json")
-            write_json(train_summary, self.export_dir / "train_summary.json")
-            write_json(train_summary, self.output_dir / "train_summary.json")
+            for filename in MODEL_METADATA_FILENAMES:
+                write_json(metadata, self.export_dir / filename)
+            for filename in TRAINING_SUMMARY_FILENAMES:
+                write_json(train_summary, self.export_dir / filename)
+                write_json(train_summary, self.output_dir / filename)
         return self.export_dir
 
     def train(self) -> Path:

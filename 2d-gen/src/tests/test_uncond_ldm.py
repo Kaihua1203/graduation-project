@@ -235,6 +235,8 @@ class UncondLatentDiffusionTest(unittest.TestCase):
             self.assertTrue((tmpdir_path / "outputs" / "checkpoints" / "checkpoint-1" / "checkpoint_state.json").exists())
             self.assertTrue((export_dir / "unet" / "config.json").exists())
             self.assertTrue((export_dir / "scheduler" / "scheduler_config.json").exists())
+            self.assertTrue((export_dir / "model_metadata.json").exists())
+            self.assertTrue((export_dir / "training_summary.json").exists())
             self.assertTrue((export_dir / "metadata.json").exists())
             self.assertTrue((export_dir / "train_summary.json").exists())
 

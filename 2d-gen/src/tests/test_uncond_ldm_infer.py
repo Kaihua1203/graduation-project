@@ -20,12 +20,14 @@ class _FakeComponentBase:
         self.name = name
         self.loaded_from: str | None = None
         self.local_files_only: bool | None = None
+        self.subfolder: str | None = None
 
     @classmethod
-    def from_pretrained(cls, path, local_files_only=True):
+    def from_pretrained(cls, path, local_files_only=True, subfolder=None):
         instance = cls(cls.__name__)
         instance.loaded_from = str(Path(path).resolve())
         instance.local_files_only = local_files_only
+        instance.subfolder = subfolder
         cls.last_instance = instance
         return instance
 
@@ -115,7 +117,14 @@ class UncondLdmCheckpointingTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (bundle_dir / "model_metadata.json").write_text(
-                json.dumps({"vae": {"pretrained_model_name_or_path": str(Path(tmpdir) / "vae")}}),
+                json.dumps(
+                    {
+                        "vae": {
+                            "pretrained_model_name_or_path": str(Path(tmpdir) / "vae"),
+                            "subfolder": "vae",
+                        }
+                    }
+                ),
                 encoding="utf-8",
             )
             (bundle_dir / "training_summary.json").write_text(json.dumps({"global_step": 10}), encoding="utf-8")
@@ -141,6 +150,27 @@ class UncondLdmCheckpointingTest(unittest.TestCase):
         self.assertEqual(_FakeDDIMScheduler.last_instance.loaded_from, str((bundle_dir / "scheduler").resolve()))
         self.assertEqual(_FakeAutoencoderKL.last_instance.loaded_from, str((Path(tmpdir) / "vae").resolve()))
         self.assertFalse(_FakeAutoencoderKL.last_instance.local_files_only)
+        self.assertEqual(_FakeAutoencoderKL.last_instance.subfolder, "vae")
+
+    def test_load_export_bundle_paths_accepts_legacy_train_filenames(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle_dir = Path(tmpdir) / "bundle"
+            (bundle_dir / "unet").mkdir(parents=True)
+            (bundle_dir / "scheduler").mkdir()
+            (bundle_dir / "scheduler" / "scheduler_config.json").write_text(
+                json.dumps({"_class_name": "DDPMScheduler"}),
+                encoding="utf-8",
+            )
+            (bundle_dir / "metadata.json").write_text(
+                json.dumps({"vae": {"pretrained_model_name_or_path": str(Path(tmpdir) / "vae")}}),
+                encoding="utf-8",
+            )
+            (bundle_dir / "train_summary.json").write_text(json.dumps({"global_step": 10}), encoding="utf-8")
+
+            bundle = checkpointing.load_export_bundle_paths(bundle_dir)
+
+        self.assertEqual(bundle.metadata_path.name, "metadata.json")
+        self.assertEqual(bundle.training_summary_path.name, "train_summary.json")
 
 
 class UncondLdmPipelineTest(unittest.TestCase):
