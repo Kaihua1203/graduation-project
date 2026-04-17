@@ -141,3 +141,11 @@ Pass `--resume` to continue unfinished runs and skip existing `sample_*.png` fil
 - `eval.real_inception_cache_dir`: optional cache directory for real-image Inception features/probabilities
 - `eval.inception_weights_path`
 - `eval.clip_model_path`
+- `eval.biomedclip_model_path`
+- `eval.real_biomedclip_cache_dir`
+
+`unconditional eval` uses `python src/eval/run_evaluate_uncond.py --config <config.yaml>` with the same `eval.*` section shape except:
+
+- `eval.generated_manifest` is not used and must be omitted
+- generated filenames must match the sorted real-image filenames exactly
+- only image-only metrics are written: `FID`, `IS`, `CLIP-I`, `Med-FID`, `BiomedCLIP-I`
