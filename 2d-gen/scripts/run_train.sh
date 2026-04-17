@@ -24,6 +24,25 @@ count_visible_gpus() {
 CONFIG_PATH="${1:?usage: bash scripts/run_train.sh <config.yaml>}"
 shift
 
+train_entrypoint="$(
+  python - "$CONFIG_PATH" <<'PY'
+import sys
+from pathlib import Path
+
+import yaml
+
+config_path = Path(sys.argv[1]).expanduser().resolve()
+with config_path.open("r", encoding="utf-8") as handle:
+    config = yaml.safe_load(handle) or {}
+
+model_config = config.get("model") or {}
+if model_config.get("model_type") == "uncond_ldm":
+    print("run_train_uncond_ldm.py")
+else:
+    print("run_train.py")
+PY
+)"
+
 launcher_args=()
 multi_gpu=0
 num_processes=""
@@ -77,4 +96,4 @@ if [ "$multi_gpu" -eq 1 ]; then
     "CUDA_VISIBLE_DEVICES lists ${visible_gpu_count} GPU(s) but --num_processes is ${num_processes}."
 fi
 
-exec accelerate launch "${launcher_args[@]}" "$SCRIPT_DIR/../src/train/run_train.py" --config "$CONFIG_PATH"
+exec accelerate launch "${launcher_args[@]}" "$SCRIPT_DIR/../src/train/$train_entrypoint" --config "$CONFIG_PATH"

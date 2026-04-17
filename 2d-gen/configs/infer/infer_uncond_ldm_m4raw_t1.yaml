@@ -1,0 +1,14 @@
+model:
+  export_bundle_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/train/uncond_ldm_m4raw_t1/export
+  vae_path: /home/jupyter-wenkaihua/data3_link/kaihua.wen/download_model/stable-diffusion-v1-5/vae
+  local_files_only: true
+
+infer:
+  reference_image_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/dataset/M4Raw-average/test/T1/images
+  output_dir: /home/jupyter-wenkaihua/data3_link/kaihua.wen/code/graduation-project/2d-gen/outputs/infer/uncond_ldm_m4raw_t1
+  batch_size: 4
+  num_inference_steps: 50
+  seed: 3407
+  image_size: 512
+  scheduler:
+    type: ddim
